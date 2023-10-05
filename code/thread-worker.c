@@ -1,16 +1,23 @@
 // File:	thread-worker.c
 
-// List all group member's name:
-// username of iLab:
-// iLab Server:
+// List all group member's name: Fulton Wilcox III, Sean Patrick
+// username of iLab: frw14, smp429
+// iLab Server: ilab4
 
 #include "thread-worker.h"
+#define STACK_SIZE SIGSTKSZ
 
 //Global counter for total context switches and 
 //average turn around and response time
 long tot_cntx_switches=0;
 double avg_turn_time=0;
 double avg_resp_time=0;
+int counter = 0;
+
+tcb *threadQueue = NULL;
+int threadQueueSize = 0;
+
+void enqueue(tcb *threadQueue, tcb thread);
 
 
 // INITAILIZE ALL YOUR OTHER VARIABLES HERE
@@ -21,13 +28,39 @@ double avg_resp_time=0;
 int worker_create(worker_t * thread, pthread_attr_t * attr, 
                       void *(*function)(void*), void * arg) {
 
-       // - create Thread Control Block (TCB)
-       // - create and initialize the context of this worker thread
-       // - allocate space of stack for this thread to run
-       // after everything is set, push this thread into run queue and 
-       // - make it ready for the execution.
+	// - create Thread Control Block (TCB)
+	// - create and initialize the context of this worker thread
+	// - allocate space of stack for this thread to run
+	// after everything is set, push this thread into run queue and 
+	// - make it ready for the execution.
 
-       // YOUR CODE HERE
+	// YOUR CODE HERE
+	
+	//creates tcb, gets context, makes stack
+	tcb* control_block = malloc(sizeof(tcb));
+	getcontext(&control_block->context);
+	void *stack=malloc(STACK_SIZE);
+	if (stack == NULL){
+		perror("Failed to allocate stack");
+		return 1;
+	}
+
+	//stack and context
+	control_block->context.uc_link=NULL;
+	control_block->context.uc_stack.ss_sp=stack;
+	control_block->context.uc_stack.ss_size=STACK_SIZE;
+	control_block->context.uc_stack.ss_flags=0;
+	control_block->stack = stack;
+
+	//other attributes
+	control_block->thread_id = ++counter;
+	control_block->status = ready;
+	control_block->priority = 0; //don't know what to do with this, we're not there yet
+
+	//is there only 1 argument for every call?
+	makecontext(&control_block->context,(void *)&function, 1, arg);
+	enqueue(threadQueue, control_block); //tcb itself serves as node because it has next pointer
+	fprintf("%d", threadQueueSize);
 	
     return 0;
 };
@@ -155,4 +188,14 @@ void print_app_stats(void) {
 // Feel free to add any other functions you need
 
 // YOUR CODE HERE
+
+void enqueue(tcb *threadQueue, tcb thread) {
+	if(threadQueue = NULL) threadQueue = thread;
+	else {
+		while(threadQueue->next != NULL) threadQueue = threadQueue->next;
+		threadQueue->next = thread;
+	}
+	thread->next = NULL;
+	threadQueueSize+=1;
+}
 
