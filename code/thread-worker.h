@@ -33,7 +33,7 @@ typedef struct TCB {
 	// And more ...
 
 	// YOUR CODE HERE
-	int thread_id;
+	worker_t thread_id;
 	status thread_status;
 	ucontext_t context;
 	void* stack;
@@ -83,9 +83,28 @@ int worker_mutex_unlock(worker_mutex_t *mutex);
 /* destroy the mutex */
 int worker_mutex_destroy(worker_mutex_t *mutex);
 
-
 /* Function to print global statistics. Do not modify this function.*/
 void print_app_stats(void);
+
+
+
+//---------------------Util methods we made-------------------------// 
+
+/* Function to add new thread to queue.*/
+void enqueue();
+
+/* Function to print thread queue.*/
+void printQueue();
+
+/* Function to print information about a thread.*/
+void toString(tcb *thread);
+
+/* Makes context for scheduler thread.*/
+int scheduler_create_context();
+
+//------------------------------------------------------------------// 
+
+
 
 #ifdef USE_WORKERS
 #define pthread_t worker_t

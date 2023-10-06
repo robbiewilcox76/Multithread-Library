@@ -3,8 +3,14 @@
 // List all group member's name: Fulton Wilcox III, Sean Patrick
 // username of iLab: frw14, smp429
 // iLab Server: ilab4
-
+#include <stdio.h>
+#include <stdlib.h>
+#include <signal.h>
+#include <sys/types.h>
+#include <unistd.h>
+#include <ucontext.h>
 #include "thread-worker.h"
+
 #define STACK_SIZE SIGSTKSZ
 
 //Global counter for total context switches and 
@@ -12,12 +18,14 @@
 long tot_cntx_switches=0;
 double avg_turn_time=0;
 double avg_resp_time=0;
-int counter = 0;
 
-tcb *threadQueue = NULL;
-int threadQueueSize = 0;
-
-void enqueue(tcb *threadQueue, tcb thread);
+//variables that I (Robbie) made
+int thread_counter = 0; //counts # of threads
+tcb *threadQueue; //queue
+int threadQueueSize = 0; 
+int has_been_called = 0; //to see if this is first call of worker_create
+ucontext_t scheduler; //context for scheduler
+ucontext_t benchmark; //context for benchmarks
 
 
 // INITAILIZE ALL YOUR OTHER VARIABLES HERE
@@ -38,7 +46,10 @@ int worker_create(worker_t * thread, pthread_attr_t * attr,
 	
 	//creates tcb, gets context, makes stack
 	tcb* control_block = malloc(sizeof(tcb));
-	getcontext(&control_block->context);
+	if (getcontext(&control_block->context) < 0){
+		perror("getcontext");
+		exit(1);
+	}
 	void *stack=malloc(STACK_SIZE);
 	if (stack == NULL){
 		perror("Failed to allocate stack");
@@ -53,15 +64,26 @@ int worker_create(worker_t * thread, pthread_attr_t * attr,
 	control_block->stack = stack;
 
 	//other attributes
-	control_block->thread_id = ++counter;
-	control_block->status = ready;
+	control_block->thread_id = thread_counter;
+	*thread = control_block->thread_id;
+	thread_counter++;
+	control_block->thread_status = ready;
 	control_block->priority = 0; //don't know what to do with this, we're not there yet
 
 	//is there only 1 argument for every call?
-	makecontext(&control_block->context,(void *)&function, 1, arg);
-	enqueue(threadQueue, control_block); //tcb itself serves as node because it has next pointer
-	fprintf("%d", threadQueueSize);
+	makecontext(&control_block->context,(void *)function, 1, arg);
 	
+	if(!has_been_called) {
+		//create context for scheduler and benchmark program
+		scheduler_create_context();
+	}
+
+	//for testing, this will actually execute the thread
+	/*if (setcontext(&control_block->context) < 0){
+		perror("set current context");
+		exit(1);
+	}*/
+
     return 0;
 };
 
@@ -189,13 +211,41 @@ void print_app_stats(void) {
 
 // YOUR CODE HERE
 
-void enqueue(tcb *threadQueue, tcb thread) {
-	if(threadQueue = NULL) threadQueue = thread;
+void enqueue(tcb *thread) {
+	if(threadQueueSize == 0) threadQueue = thread;
 	else {
-		while(threadQueue->next != NULL) threadQueue = threadQueue->next;
-		threadQueue->next = thread;
+		tcb *temp = threadQueue;
+		while(temp->next != NULL) temp = temp->next;
+		temp->next = thread;
 	}
 	thread->next = NULL;
 	threadQueueSize+=1;
+}
+
+void printQueue() {
+	tcb *temp = threadQueue;
+	while(temp != NULL) {
+		printf("thread %d, ", temp->thread_id);
+		temp = temp->next;
+	}
+	printf("\nThread size: %d\n", threadQueueSize);
+}
+
+void toString(tcb *thread) {
+	printf("Thread id: %d\nStatus: %d\n\n", thread->thread_id, thread->thread_status);
+}
+
+int scheduler_create_context() {
+	getcontext(&scheduler);
+	void* stack = malloc(SIGSTKSZ);
+	scheduler.uc_link=NULL;
+	scheduler.uc_stack.ss_sp=stack;
+	scheduler.uc_stack.ss_size=STACK_SIZE;
+	scheduler.uc_stack.ss_flags=0;
+
+	makecontext(&scheduler, (void *)&schedule, 0, NULL);
+	printf("hi");
+	has_been_called = 1;
+	return 0;
 }
 

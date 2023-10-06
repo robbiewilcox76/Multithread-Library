@@ -11,13 +11,13 @@
  * This will not be graded.
  */
 
-int fun() {
-	printf("testinf multithreading");
+void fun(int c) {
+	printf("testing multithreading : %d\n", c);
 }
 
 int main(int argc, char **argv) {
 	worker_t thread;
-	int num = worker_create(thread,NULL, &fun, NULL); 
+	int num = worker_create(&thread, NULL, (void*)&fun, i); 
 
 	return 0;
 }
