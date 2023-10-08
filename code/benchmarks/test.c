@@ -12,12 +12,22 @@
  */
 
 void fun(int c) {
-	printf("testing multithreading : %d\n", c);
+	for(int i=0; i<100000000; i++) {}
+	printf("first down\n");
+	for(int i=0; i<100000000; i++) {}
+	printf("second down\n");
+	for(int i=0; i<100000000; i++) {}
+	printf("third down\n");
+	for(int i=0; i<100000000; i++) {}
+	printf("fourth down\n");
+	for(int i=0; i<100000000; i++) {}
 }
 
-int main(int argc, char **argv) {
-	worker_t thread;
-	int num = worker_create(&thread, NULL, (void*)&fun, i); 
 
+int main(int argc, char **argv) {
+	worker_t thread1;
+	int num = worker_create(&thread1, NULL, (void*)&fun, 6); 
+	puts("other thread\n");
+	//worker_yield();
 	return 0;
 }

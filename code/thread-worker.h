@@ -11,6 +11,8 @@
 
 /* To use Linux pthread Library in Benchmark, you have to comment the USE_WORKERS macro */
 #define USE_WORKERS 1
+#define TIME_S 1/100
+#define TIME_US 100000
 
 /* include lib header files that you need here: */
 #include <unistd.h>
@@ -87,11 +89,15 @@ int worker_mutex_destroy(worker_mutex_t *mutex);
 void print_app_stats(void);
 
 
-
 //---------------------Util methods we made-------------------------// 
 
 /* Function to add new thread to queue.*/
 void enqueue();
+
+/* Function to remove thread .*/
+void dequeue();
+
+int isEmpty();
 
 /* Function to print thread queue.*/
 void printQueue();
@@ -100,10 +106,9 @@ void printQueue();
 void toString(tcb *thread);
 
 /* Makes context for scheduler thread.*/
-int scheduler_create_context();
+int scheduler_benchmark_create_context();
 
 //------------------------------------------------------------------// 
-
 
 
 #ifdef USE_WORKERS

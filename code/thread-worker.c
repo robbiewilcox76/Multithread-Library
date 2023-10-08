@@ -8,10 +8,13 @@
 #include <signal.h>
 #include <sys/types.h>
 #include <unistd.h>
+#include <string.h>
 #include <ucontext.h>
+#include <sys/time.h>
 #include "thread-worker.h"
 
 #define STACK_SIZE SIGSTKSZ
+#define DEBUG 0
 
 //Global counter for total context switches and 
 //average turn around and response time
@@ -19,18 +22,23 @@ long tot_cntx_switches=0;
 double avg_turn_time=0;
 double avg_resp_time=0;
 
-//variables that I (Robbie) made
-int thread_counter = 0; //counts # of threads
-tcb *threadQueue; //queue
-int threadQueueSize = 0; 
-int has_been_called = 0; //to see if this is first call of worker_create
-ucontext_t scheduler; //context for scheduler
-ucontext_t benchmark; //context for benchmarks
-
-
 // INITAILIZE ALL YOUR OTHER VARIABLES HERE
 // YOUR CODE HERE
 
+//variables that I (Robbie) made
+int thread_counter = 0; //counts # of threads
+tcb *threadQueue; //queue
+//int threadQueueSize = 0; 
+int has_been_called = 0; //to see if this is first call of worker_create
+ucontext_t scheduler; //context for scheduler
+ucontext_t benchmark; //context for benchmarks
+ucontext_t initial; //context for initial call
+struct itimerval sched_timer; //timer
+tcb *curThread; //currently running thread
+
+static void signal_handler();
+static void enable_timer();
+static void disable_timer();
 
 /* create a new thread */
 int worker_create(worker_t * thread, pthread_attr_t * attr, 
@@ -72,18 +80,11 @@ int worker_create(worker_t * thread, pthread_attr_t * attr,
 
 	//is there only 1 argument for every call?
 	makecontext(&control_block->context,(void *)function, 1, arg);
-	
+	enqueue(control_block);
 	if(!has_been_called) {
 		//create context for scheduler and benchmark program
-		scheduler_create_context();
+		scheduler_benchmark_create_context();
 	}
-
-	//for testing, this will actually execute the thread
-	/*if (setcontext(&control_block->context) < 0){
-		perror("set current context");
-		exit(1);
-	}*/
-
     return 0;
 };
 
@@ -94,7 +95,10 @@ int worker_yield() {
 	// - save context of this thread to its thread control block
 	// - switch from thread context to scheduler context
 
-	// YOUR CODE HERE
+	if(curThread != NULL) {
+		curThread->thread_status = ready;
+		swapcontext(&scheduler, &curThread->context);
+	}
 	
 	return 0;
 };
@@ -158,6 +162,16 @@ int worker_mutex_destroy(worker_mutex_t *mutex) {
 
 /* scheduler */
 static void schedule() {
+	disable_timer();
+	if(DEBUG) printf("inside scheduler\n");
+	while(!isEmpty()) {
+		if(DEBUG) printf("swapping\n");
+		enable_timer();
+		dequeue();
+		printQueue();
+		if(curThread != NULL) swapcontext(&scheduler, &curThread->context);
+		//enqueue(curThread);
+	}
 	// - every time a timer interrupt occurs, your worker thread library 
 	// should be contexted switched from a thread context to this 
 	// schedule() function
@@ -212,14 +226,22 @@ void print_app_stats(void) {
 // YOUR CODE HERE
 
 void enqueue(tcb *thread) {
-	if(threadQueueSize == 0) threadQueue = thread;
+	if(threadQueue == NULL) threadQueue = thread;
 	else {
 		tcb *temp = threadQueue;
 		while(temp->next != NULL) temp = temp->next;
 		temp->next = thread;
 	}
 	thread->next = NULL;
-	threadQueueSize+=1;
+}
+
+void dequeue() {
+	curThread = threadQueue;
+	threadQueue = threadQueue->next;
+}
+
+int isEmpty() {
+	return threadQueue == NULL;
 }
 
 void printQueue() {
@@ -228,23 +250,67 @@ void printQueue() {
 		printf("thread %d, ", temp->thread_id);
 		temp = temp->next;
 	}
-	printf("\nThread size: %d\n", threadQueueSize);
 }
 
 void toString(tcb *thread) {
 	printf("Thread id: %d\nStatus: %d\n\n", thread->thread_id, thread->thread_status);
 }
 
-int scheduler_create_context() {
+static void signal_handler(int signum) {
+	if(DEBUG) puts("signal received\n");
+	enqueue(curThread);
+	if(curThread != NULL ) swapcontext(&curThread->context, &scheduler);
+}
+
+static void enable_timer() {
+	sched_timer.it_interval.tv_usec = TIME_US; 
+	sched_timer.it_interval.tv_sec = TIME_S;
+
+	sched_timer.it_value.tv_usec = TIME_US;
+	sched_timer.it_value.tv_sec = TIME_S;
+	setitimer(ITIMER_PROF, &sched_timer, NULL);
+}
+
+static void disable_timer() {
+	sched_timer.it_interval.tv_usec = 0; 
+	sched_timer.it_interval.tv_sec = 0;
+
+	sched_timer.it_value.tv_usec = 0;
+	sched_timer.it_value.tv_sec = 0;
+	setitimer(ITIMER_PROF, &sched_timer, NULL);
+}
+
+void setup_timer() {
+	// Use sigaction to register signal handler
+	struct sigaction sa;
+	memset (&sa, 0, sizeof (sa));
+	sa.sa_handler = &signal_handler;
+	sigaction (SIGPROF, &sa, NULL);
+
+	// Set up what the timer should reset to after the timer goes off
+
+	sched_timer.it_interval.tv_usec = TIME_US; 
+	sched_timer.it_interval.tv_sec = TIME_S;
+
+	sched_timer.it_value.tv_usec = TIME_US;
+	sched_timer.it_value.tv_sec = TIME_S;
+
+	// Set the timer up (start the timer)
+	setitimer(ITIMER_PROF, &sched_timer, NULL);
+}
+
+int scheduler_benchmark_create_context() {
 	getcontext(&scheduler);
 	void* stack = malloc(SIGSTKSZ);
 	scheduler.uc_link=NULL;
 	scheduler.uc_stack.ss_sp=stack;
 	scheduler.uc_stack.ss_size=STACK_SIZE;
 	scheduler.uc_stack.ss_flags=0;
+	if(DEBUG) printf("scheduler/benchmark context created\n");
 
 	makecontext(&scheduler, (void *)&schedule, 0, NULL);
-	printf("hi");
+	setup_timer();
+	setcontext(&scheduler);
 	has_been_called = 1;
 	return 0;
 }
