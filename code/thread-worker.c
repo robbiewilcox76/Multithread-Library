@@ -14,7 +14,7 @@
 #include "thread-worker.h"
 
 #define STACK_SIZE SIGSTKSZ
-#define DEBUG 0
+#define DEBUG 1
 
 //Global counter for total context switches and 
 //average turn around and response time
@@ -29,16 +29,17 @@ double avg_resp_time=0;
 int thread_counter = 0; //counts # of threads
 tcb *threadQueue; //queue
 //int threadQueueSize = 0; 
-int has_been_called = 0; //to see if this is first call of worker_create
 ucontext_t scheduler; //context for scheduler
 ucontext_t benchmark; //context for benchmarks
 ucontext_t initial; //context for initial call
 struct itimerval sched_timer; //timer
 tcb *curThread; //currently running thread
+int initialcall = 1;
 
 static void signal_handler();
 static void enable_timer();
 static void disable_timer();
+static void create_tcb(worker_t * thread, tcb* control_block, void *(*function)(void*), void * arg);
 
 /* create a new thread */
 int worker_create(worker_t * thread, pthread_attr_t * attr, 
@@ -54,34 +55,10 @@ int worker_create(worker_t * thread, pthread_attr_t * attr,
 	
 	//creates tcb, gets context, makes stack
 	tcb* control_block = malloc(sizeof(tcb));
-	if (getcontext(&control_block->context) < 0){
-		perror("getcontext");
-		exit(1);
-	}
-	void *stack=malloc(STACK_SIZE);
-	if (stack == NULL){
-		perror("Failed to allocate stack");
-		return 1;
-	}
+	create_tcb(thread, control_block, function, arg);
 
-	//stack and context
-	control_block->context.uc_link=NULL;
-	control_block->context.uc_stack.ss_sp=stack;
-	control_block->context.uc_stack.ss_size=STACK_SIZE;
-	control_block->context.uc_stack.ss_flags=0;
-	control_block->stack = stack;
-
-	//other attributes
-	control_block->thread_id = thread_counter;
-	*thread = control_block->thread_id;
-	thread_counter++;
-	control_block->thread_status = ready;
-	control_block->priority = 0; //don't know what to do with this, we're not there yet
-
-	//is there only 1 argument for every call?
-	makecontext(&control_block->context,(void *)function, 1, arg);
 	enqueue(control_block);
-	if(!has_been_called) {
+	if(initialcall) {
 		//create context for scheduler and benchmark program
 		scheduler_benchmark_create_context();
 	}
@@ -162,6 +139,11 @@ int worker_mutex_destroy(worker_mutex_t *mutex) {
 
 /* scheduler */
 static void schedule() {
+	if(initialcall) {
+		if(DEBUG) puts("initial call");
+		initialcall = 0;
+		swapcontext(&scheduler, &initial);
+	}
 	disable_timer();
 	if(DEBUG) printf("inside scheduler\n");
 	while(!isEmpty()) {
@@ -172,6 +154,7 @@ static void schedule() {
 		if(curThread != NULL) swapcontext(&scheduler, &curThread->context);
 		//enqueue(curThread);
 	}
+	if(DEBUG) printf("exiting scheduler");
 	// - every time a timer interrupt occurs, your worker thread library 
 	// should be contexted switched from a thread context to this 
 	// schedule() function
@@ -224,6 +207,33 @@ void print_app_stats(void) {
 // Feel free to add any other functions you need
 
 // YOUR CODE HERE
+
+static void create_tcb(worker_t * thread, tcb* control_block, void *(*function)(void*), void * arg) {
+	if (getcontext(&control_block->context) < 0){
+		perror("getcontext");
+		exit(1);
+	}
+	void *stack=malloc(STACK_SIZE);
+	if (stack == NULL){
+		perror("Failed to allocate stack");
+		exit(1);
+	}
+
+	//stack and context
+	control_block->context.uc_link=&scheduler;
+	control_block->context.uc_stack.ss_sp=stack;
+	control_block->context.uc_stack.ss_size=STACK_SIZE;
+	control_block->context.uc_stack.ss_flags=0;
+	control_block->stack = stack;
+
+	//other attributes
+	control_block->thread_id = thread_counter;
+	*thread = control_block->thread_id;
+	thread_counter++;
+	control_block->thread_status = ready;
+	control_block->priority = 0; //don't know what to do with this, we're not there yet
+	makecontext(&control_block->context,(void *)function, 1, arg);
+}
 
 void enqueue(tcb *thread) {
 	if(threadQueue == NULL) threadQueue = thread;
@@ -310,8 +320,9 @@ int scheduler_benchmark_create_context() {
 
 	makecontext(&scheduler, (void *)&schedule, 0, NULL);
 	setup_timer();
-	setcontext(&scheduler);
-	has_been_called = 1;
+	getcontext(&initial);
+	initial.uc_link=&scheduler;
+	swapcontext(&initial ,&scheduler);
 	return 0;
 }
 

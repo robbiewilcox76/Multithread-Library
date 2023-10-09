@@ -9,7 +9,7 @@
 
 void*  f1withparam(ucontext_t *nctx){
 	puts("Donald- you are threaded\n");
-	setcontext(nctx);
+	//setcontext(nctx);
 	/* setcontext sets PC <--value in nctx context*/
 }
 
@@ -35,7 +35,7 @@ int main(int argc, char **argv) {
 	}
       
 	/* Setup context that we are going to use */
-	cctx.uc_link=NULL;
+	cctx.uc_link=&nctx;
 	cctx.uc_stack.ss_sp=stack;
 	cctx.uc_stack.ss_size=STACK_SIZE;
 	cctx.uc_stack.ss_flags=0;
