@@ -31,7 +31,7 @@ tcb *threadQueue; //queue
 //int threadQueueSize = 0; 
 ucontext_t scheduler; //context for scheduler
 ucontext_t benchmark; //context for benchmarks
-ucontext_t initial; //context for initial call
+ucontext_t context_main; //context for main thread creation call
 struct itimerval sched_timer; //timer
 tcb *curThread; //currently running thread
 int initialcall = 1;
@@ -165,22 +165,22 @@ int worker_mutex_destroy(worker_mutex_t *mutex) {
 
 /* scheduler */
 static void schedule() {
-	if(!initialcall) {
+	if(initialcall) {
 		if(DEBUG) puts("initial call");
 		initialcall = 0;
-		swapcontext(&scheduler, &initial);
+		swapcontext(&scheduler, &context_main);
 	}
 	disable_timer();
 	if(DEBUG) printf("inside scheduler\n");
 	while(!isEmpty()) {
 		if(DEBUG) printf("swapping\n");
-		enable_timer();
 		dequeue();
 		printQueue();
+		enable_timer();
 		if(curThread != NULL) swapcontext(&scheduler, &curThread->context);
 		//enqueue(curThread);
 	}
-	if(DEBUG) printf("exiting scheduler");
+	if(DEBUG) puts("exiting scheduler");
 	// - every time a timer interrupt occurs, your worker thread library 
 	// should be contexted switched from a thread context to this 
 	// schedule() function
@@ -286,6 +286,7 @@ void printQueue() {
 		printf("thread %d, ", temp->thread_id);
 		temp = temp->next;
 	}
+	printf("\n");
 }
 
 void toString(tcb *thread) {
@@ -346,9 +347,19 @@ int scheduler_benchmark_create_context() {
 
 	makecontext(&scheduler, (void *)&schedule, 0, NULL);
 	setup_timer();
-	getcontext(&initial);
-	initial.uc_link=&scheduler;
-	swapcontext(&initial ,&scheduler);
+
+	getcontext(&context_main);
+
+	tcb * mainTCB = malloc(sizeof(tcb));
+
+	//other attributes
+	mainTCB->thread_id = thread_counter;
+	thread_counter++;
+	mainTCB->thread_status = ready;
+	mainTCB->priority = 0; //don't know what to do with this, we're not there yet
+	enqueue(mainTCB);
+
+	swapcontext(&mainTCB->context ,&scheduler);
 	return 0;
 }
 
