@@ -139,7 +139,7 @@ int worker_mutex_destroy(worker_mutex_t *mutex) {
 
 /* scheduler */
 static void schedule() {
-	if(initialcall) {
+	if(!initialcall) {
 		if(DEBUG) puts("initial call");
 		initialcall = 0;
 		swapcontext(&scheduler, &initial);
