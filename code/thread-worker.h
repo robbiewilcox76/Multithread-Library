@@ -49,6 +49,11 @@ typedef struct worker_mutex_t {
 	/* add something here */
 
 	// YOUR CODE HERE
+	volatile int initialized; //is mutex initialized
+	volatile int locked; //is mutex lock currently locked
+	tcb* mutex_owner;
+	tcb* lock_owner; //pointer to TCB owner of current mutex lock
+
 } worker_mutex_t;
 
 /* define your data structures here: */

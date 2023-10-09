@@ -104,6 +104,17 @@ int worker_mutex_init(worker_mutex_t *mutex,
 	//- initialize data structures for this mutex
 
 	// YOUR CODE HERE
+
+	if(mutex != NULL){
+		if(mutex->initialized == 1) return -1;
+	}
+	mutex = malloc(sizeof(worker_mutex_t));
+	if(mutex == NULL) return -1;
+	mutex->initialized = 1;
+	mutex->locked = 0;
+	mutex->mutex_owner = curThread;
+	mutex->lock_owner = NULL;
+
 	return 0;
 };
 
@@ -116,6 +127,12 @@ int worker_mutex_lock(worker_mutex_t *mutex) {
         // context switch to the scheduler thread
 
         // YOUR CODE HERE
+
+		if(mutex == NULL) return -1;
+		if(mutex != NULL){
+			if(mutex->locked == 1) return -1;
+		}
+
         return 0;
 };
 
@@ -134,7 +151,16 @@ int worker_mutex_unlock(worker_mutex_t *mutex) {
 int worker_mutex_destroy(worker_mutex_t *mutex) {
 	// - de-allocate dynamic memory created in worker_mutex_init
 
-	return 0;
+	if(mutex == NULL) return -1;
+	if(mutex != NULL){
+		if(mutex->initialized == 0 || mutex->locked == 1) return -1;
+	}
+	if(mutex->mutex_owner == curThread){
+		free(mutex);
+		return 0;
+	}
+
+	return -1;
 };
 
 /* scheduler */
