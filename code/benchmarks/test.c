@@ -12,7 +12,7 @@
  */
 
 void fun(int c) {
-/*	for(int i=0; i<100000000; i++) {}
+	for(int i=0; i<100000000; i++) {}
 	printf("first down\n");
 	for(int i=0; i<100000000; i++) {}
 	printf("second down\n");
@@ -21,15 +21,17 @@ void fun(int c) {
 	for(int i=0; i<100000000; i++) {}
 	printf("fourth down\n");
 	for(int i=0; i<100000000; i++) {}
-	printf("fifth down\n");*/
-	printf("I am gay");
+	printf("fifth down\n");
+	printf("\nI am gay\n");
+	pthread_exit(NULL);
 }
 
 
 int main(int argc, char **argv) {
 	worker_t thread1;
 	int num = worker_create(&thread1, NULL, (void*)&fun, 6); 
-	//printf("other thread");
+	pthread_join(thread1, NULL);
+	printf("\nother thread\n");
 	while(1){}
 	return 0;
 }

@@ -41,6 +41,7 @@ typedef struct TCB {
 	void* stack;
 	int priority;
 	struct TCB* next;
+	void* return_value;
 
 } tcb; 
 
@@ -97,15 +98,15 @@ void print_app_stats(void);
 //---------------------Util methods we made-------------------------// 
 
 /* Function to add new thread to queue.*/
-void enqueue();
+void enqueue(tcb *thread, tcb *queue);
 
 /* Function to remove thread .*/
 void dequeue();
 
-int isEmpty();
+int isEmpty(tcb *threadQueue);
 
 /* Function to print thread queue.*/
-void printQueue();
+void printQueue(tcb *queue);
 
 /* Function to print information about a thread.*/
 void toString(tcb *thread);
