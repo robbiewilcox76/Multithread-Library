@@ -98,10 +98,10 @@ void print_app_stats(void);
 //---------------------Util methods we made-------------------------// 
 
 /* Function to add new thread to queue.*/
-void enqueue(tcb *thread, tcb *queue);
+tcb* enqueue(tcb *thread, tcb *queue);
 
 /* Function to remove thread .*/
-void dequeue();
+tcb* dequeue(tcb *queue);
 
 int isEmpty(tcb *threadQueue);
 

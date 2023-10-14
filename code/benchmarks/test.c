@@ -23,15 +23,15 @@ void fun(int c) {
 	for(int i=0; i<100000000; i++) {}
 	printf("fifth down\n");
 	printf("\nI am gay\n");
-	pthread_exit(NULL);
+	worker_exit(NULL);
 }
 
 
 int main(int argc, char **argv) {
 	worker_t thread1;
 	int num = worker_create(&thread1, NULL, (void*)&fun, 6); 
-	pthread_join(thread1, NULL);
+	worker_join(thread1, NULL);
 	printf("\nother thread\n");
-	while(1){}
+	//while(1){}
 	return 0;
 }

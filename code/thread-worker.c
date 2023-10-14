@@ -28,6 +28,7 @@ double avg_resp_time=0;
 //variables that I (Robbie) made
 int thread_counter = 0; //counts # of threads
 tcb *threadQueue; //queue
+tcb *blockedQueue; //blocked queue (Sean)
 //int threadQueueSize = 0; 
 ucontext_t scheduler; //context for scheduler
 ucontext_t benchmark; //context for benchmarks
@@ -59,7 +60,7 @@ int worker_create(worker_t * thread, pthread_attr_t * attr,
 	//creates tcb, gets context, makes stack
 	tcb* control_block = malloc(sizeof(tcb));
 	create_tcb(thread, control_block, function, arg);
-	
+	threadQueue = enqueue(control_block, threadQueue);
 	if(initialcall) {
 		//create context for scheduler and benchmark program
 		scheduler_benchmark_create_context();
@@ -86,7 +87,7 @@ int worker_yield() {
 void worker_exit(void *value_ptr) {
 	if(DEBUG) printf("Thread %d terminating\n", curThread->thread_id);
 	disable_timer();
-	free(curThread->stack);
+	//free(curThread->stack);
 	curThread->thread_status = terminated;
 	if(value_ptr) curThread->return_value = value_ptr;
 };
@@ -94,21 +95,28 @@ void worker_exit(void *value_ptr) {
 
 /* Wait for thread termination */
 int worker_join(worker_t thread, void **value_ptr) {
-	
 	// - wait for a specific thread to terminate
 	// - de-allocate any dynamic memory created by the joining thread
-	tcb* joining_thread = search(thread, threadQueue);
+	tcb *joining_thread = search(thread, threadQueue);
+	if(joining_thread == NULL) exit(0);
 	printf("found %d, searched with %d", joining_thread->thread_id, thread);
 	curThread->thread_status = blocked;
 
 	//add curThread to blocked queue
+	blockedQueue = enqueue(curThread, blockedQueue);
+	//threadQueue = dequeue(threadQueue); //do we need to remove curThread from threadQueue?
 
 	while(joining_thread->thread_status != terminated);
-	curThread->thread_status = ready;
 
 	//remove from blocked queue, add to ready queue
+	blockedQueue = dequeue(blockedQueue); //this will set curThread to head of blockedQueue
+	curThread->thread_status = ready;
+	threadQueue = enqueue(curThread, threadQueue);
 
 	// YOUR CODE HERE
+	if(value_ptr) *value_ptr = joining_thread->return_value; //save return value
+	if(joining_thread->stack) free(joining_thread->stack); //free thread memory
+	free(joining_thread);
 
 	return 0;
 };
@@ -184,12 +192,12 @@ static void schedule() {
 	disable_timer();
 	if(DEBUG) printf("inside scheduler\n");
 	while(!isEmpty(threadQueue)) {
-		dequeue();
+		threadQueue = dequeue(threadQueue);
 		if(DEBUG) printf("swapping to thread %d\n", curThread->thread_id);
 		enable_timer();
 		if(curThread != NULL) swapcontext(&scheduler, &curThread->context);
 		printQueue(threadQueue);
-		if(curThread->thread_status != terminated) enqueue(curThread, threadQueue);
+		if(curThread->thread_status != terminated) threadQueue = enqueue(curThread, threadQueue);
 	}
 	if(DEBUG) puts("exiting scheduler");
 	// - every time a timer interrupt occurs, your worker thread library 
@@ -272,7 +280,7 @@ static void create_tcb(worker_t * thread, tcb* control_block, void *(*function)(
 	makecontext(&control_block->context,(void *)function, 1, arg);
 }
 
-void enqueue(tcb *thread, tcb *queue) {
+tcb* enqueue(tcb *thread, tcb *queue) {
 	if(queue == NULL) queue = thread;
 	else {
 		tcb *temp = queue;
@@ -280,11 +288,13 @@ void enqueue(tcb *thread, tcb *queue) {
 		temp->next = thread;
 	}
 	thread->next = NULL;
+	return queue;
 }
 
-void dequeue() {
-	curThread = threadQueue;
-	threadQueue = threadQueue->next;
+tcb* dequeue(tcb *queue) {
+	curThread = queue;
+	queue = queue->next;
+	return queue;
 }
 
 static tcb* search(worker_t thread, tcb* queue) {
@@ -369,16 +379,15 @@ int scheduler_benchmark_create_context() {
 
 	getcontext(&context_main);
 
-	tcb * mainTCB = malloc(sizeof(tcb));
+	tcb *mainTCB = malloc(sizeof(tcb));
 
 	//other attributes
 	mainTCB->thread_id = thread_counter;
 	thread_counter++;
 	mainTCB->thread_status = ready;
 	mainTCB->priority = 0; //don't know what to do with this, we're not there yet
-	enqueue(mainTCB, threadQueue);
-
-	swapcontext(&mainTCB->context ,&scheduler);
+	threadQueue = enqueue(mainTCB, threadQueue);
+	swapcontext(&mainTCB->context, &scheduler);
 	return 0;
 }
 
