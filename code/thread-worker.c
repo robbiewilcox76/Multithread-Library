@@ -85,7 +85,7 @@ int worker_yield() {
 
 /* terminate a thread */
 void worker_exit(void *value_ptr) {
-	//if(DEBUG) printf("Thread %d terminating\n", curThread->thread_id);
+	if(DEBUG) printf("Thread %d terminating\n", curThread->thread_id);
 	disable_timer();
 	//free(curThread->stack);
 	curThread->thread_status = terminated;
@@ -193,10 +193,10 @@ static void schedule() {
 	if(DEBUG) printf("inside scheduler\n");
 	while(!isEmpty(threadQueue)) {
 		threadQueue = dequeue(threadQueue);
-		//if(DEBUG) printf("swapping to thread %d\n", curThread->thread_id);
+		if(DEBUG) printf("swapping to thread %d\n", curThread->thread_id);
 		enable_timer();
 		if(curThread != NULL) swapcontext(&scheduler, &curThread->context);
-		//printQueue(threadQueue);
+		printQueue(threadQueue);
 		if(curThread->thread_status != terminated) threadQueue = enqueue(curThread, threadQueue);
 	}
 	if(DEBUG) puts("exiting scheduler");
@@ -324,7 +324,7 @@ void toString(tcb *thread) {
 }
 
 static void signal_handler(int signum) {
-	//if(DEBUG) puts("signal received\n");
+	if(DEBUG) puts("signal received\n");
 	if(curThread != NULL ) swapcontext(&curThread->context, &scheduler);
 }
 
