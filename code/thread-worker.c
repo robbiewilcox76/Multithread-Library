@@ -99,19 +99,19 @@ int worker_join(worker_t thread, void **value_ptr) {
 	// - de-allocate any dynamic memory created by the joining thread
 	tcb *joining_thread = search(thread, threadQueue);
 	if(joining_thread == NULL) exit(0);
-	//printf("found %d, searched with %d", joining_thread->thread_id, thread);
-	curThread->thread_status = blocked;
+	printf("found %d, searched with %d", joining_thread->thread_id, thread);
+	//curThread->thread_status = blocked;
 
 	//add curThread to blocked queue
-	blockedQueue = enqueue(curThread, blockedQueue);
+	//blockedQueue = enqueue(curThread, blockedQueue);
 	//threadQueue = dequeue(threadQueue); //do we need to remove curThread from threadQueue?
 
-	while(joining_thread->thread_status != terminated);
+	while(joining_thread->thread_status != terminated){}
 
 	//remove from blocked queue, add to ready queue
-	blockedQueue = dequeue(blockedQueue); //this will set curThread to head of blockedQueue
-	curThread->thread_status = ready;
-	threadQueue = enqueue(curThread, threadQueue);
+	//blockedQueue = dequeue(blockedQueue); //this will set curThread to head of blockedQueue
+	//curThread->thread_status = ready;
+	//threadQueue = enqueue(curThread, threadQueue);
 
 	// YOUR CODE HERE
 	if(value_ptr) *value_ptr = joining_thread->return_value; //save return value
@@ -194,10 +194,14 @@ static void schedule() {
 	while(!isEmpty(threadQueue)) {
 		threadQueue = dequeue(threadQueue);
 		if(DEBUG) printf("swapping to thread %d\n", curThread->thread_id);
+		curThread->thread_status = running;
 		enable_timer();
 		if(curThread != NULL) swapcontext(&scheduler, &curThread->context);
 		printQueue(threadQueue);
-		if(curThread->thread_status != terminated) threadQueue = enqueue(curThread, threadQueue);
+		if(curThread->thread_status != terminated /*curThread->thread_status != blocked*/){ 
+			curThread->thread_status = ready;
+			threadQueue = enqueue(curThread, threadQueue);
+		}
 	}
 	if(DEBUG) puts("exiting scheduler");
 	// - every time a timer interrupt occurs, your worker thread library 
@@ -366,6 +370,7 @@ void setup_timer() {
 }
 
 int scheduler_benchmark_create_context() {
+	initialcall = 0;
 	getcontext(&scheduler);
 	void* stack = malloc(SIGSTKSZ);
 	scheduler.uc_link=NULL;

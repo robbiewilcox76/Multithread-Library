@@ -31,10 +31,10 @@ int main(int argc, char **argv) {
 	worker_t thread1, thread2, thread3;
 	int num1 = worker_create(&thread1, NULL, (void*)&fun, 6);
 	int num2 = worker_create(&thread2, NULL, (void*)&fun, 6); 
-	int num3 = worker_create(&thread2, NULL, (void*)&fun, 6); 
+	//int num3 = worker_create(&thread2, NULL, (void*)&fun, 6); 
 	worker_join(thread1, NULL);
 	worker_join(thread2, NULL);
-	worker_join(thread3, NULL);
+	//worker_join(thread3, NULL);
 	printf("\nother thread\n");
 	//while(1){}
 	return 0;
