@@ -14,7 +14,7 @@
 #include "thread-worker.h"
 
 #define STACK_SIZE SIGSTKSZ
-#define DEBUG 1
+#define DEBUG 0
 
 //Global counter for total context switches and 
 //average turn around and response time
@@ -76,8 +76,9 @@ int worker_yield() {
 	// - switch from thread context to scheduler context
 
 	if(curThread != NULL) {
+		if(DEBUG) printf("yielding...");
 		curThread->thread_status = ready;
-		swapcontext(&scheduler, &curThread->context);
+		swapcontext(&curThread->context, &scheduler);
 	}
 	
 	return 0;
@@ -99,14 +100,14 @@ int worker_join(worker_t thread, void **value_ptr) {
 	// - de-allocate any dynamic memory created by the joining thread
 	tcb *joining_thread = search(thread, threadQueue);
 	if(joining_thread == NULL) exit(0);
-	printf("found %d, searched with %d", joining_thread->thread_id, thread);
+	if(DEBUG)printf("found %d, searched with %d", joining_thread->thread_id, thread);
 	//curThread->thread_status = blocked;
 
 	//add curThread to blocked queue
 	//blockedQueue = enqueue(curThread, blockedQueue);
 	//threadQueue = dequeue(threadQueue); //do we need to remove curThread from threadQueue?
 
-	while(joining_thread->thread_status != terminated){}
+	while(joining_thread->thread_status != terminated) {swapcontext(&curThread->context, &scheduler);}
 
 	//remove from blocked queue, add to ready queue
 	//blockedQueue = dequeue(blockedQueue); //this will set curThread to head of blockedQueue
@@ -189,21 +190,20 @@ int worker_mutex_destroy(worker_mutex_t *mutex) {
 /* scheduler */
 static void schedule() {
 
-	disable_timer();
 	if(DEBUG) printf("inside scheduler\n");
 	while(!isEmpty(threadQueue)) {
+		disable_timer();
 		threadQueue = dequeue(threadQueue);
 		if(DEBUG) printf("swapping to thread %d\n", curThread->thread_id);
 		curThread->thread_status = running;
 		enable_timer();
 		if(curThread != NULL) swapcontext(&scheduler, &curThread->context);
-		printQueue(threadQueue);
+		if(DEBUG)printQueue(threadQueue);
 		if(curThread->thread_status != terminated /*curThread->thread_status != blocked*/){ 
 			curThread->thread_status = ready;
 			threadQueue = enqueue(curThread, threadQueue);
 		}
 	}
-	if(DEBUG) puts("exiting scheduler");
 	// - every time a timer interrupt occurs, your worker thread library 
 	// should be contexted switched from a thread context to this 
 	// schedule() function
