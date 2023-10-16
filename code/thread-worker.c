@@ -14,7 +14,7 @@
 #include "thread-worker.h"
 
 #define STACK_SIZE SIGSTKSZ
-#define DEBUG 0
+#define DEBUG 1
 
 //Global counter for total context switches and 
 //average turn around and response time
@@ -88,7 +88,6 @@ int worker_yield() {
 void worker_exit(void *value_ptr) {
 	if(DEBUG) printf("Thread %d terminating\n", curThread->thread_id);
 	disable_timer();
-	//free(curThread->stack);
 	curThread->thread_status = terminated;
 	if(value_ptr) curThread->return_value = value_ptr;
 };
@@ -98,23 +97,18 @@ void worker_exit(void *value_ptr) {
 int worker_join(worker_t thread, void **value_ptr) {
 	// - wait for a specific thread to terminate
 	// - de-allocate any dynamic memory created by the joining thread
-	tcb *joining_thread = search(thread, threadQueue);
-	if(joining_thread == NULL) exit(0);
-	if(DEBUG)printf("found %d, searched with %d", joining_thread->thread_id, thread);
-	//curThread->thread_status = blocked;
 
-	//add curThread to blocked queue
-	//blockedQueue = enqueue(curThread, blockedQueue);
-	//threadQueue = dequeue(threadQueue); //do we need to remove curThread from threadQueue?
+	// YOUR CODE HERE
+
+	tcb *joining_thread = search(thread, threadQueue);
+	if(joining_thread == NULL){
+		joining_thread = search(thread, blockedQueue);
+		if(joining_thread == NULL) exit(0);
+	}
+	if(DEBUG)printf("found %d, searched with %d", joining_thread->thread_id, thread);
 
 	while(joining_thread->thread_status != terminated) {swapcontext(&curThread->context, &scheduler);}
 
-	//remove from blocked queue, add to ready queue
-	//blockedQueue = dequeue(blockedQueue); //this will set curThread to head of blockedQueue
-	//curThread->thread_status = ready;
-	//threadQueue = enqueue(curThread, threadQueue);
-
-	// YOUR CODE HERE
 	if(value_ptr) *value_ptr = joining_thread->return_value; //save return value
 	if(joining_thread->stack) free(joining_thread->stack); //free thread memory
 	free(joining_thread);
@@ -129,15 +123,14 @@ int worker_mutex_init(worker_mutex_t *mutex,
 
 	// YOUR CODE HERE
 
-	if(mutex != NULL){
-		if(mutex->initialized == 1) return -1;
-	}
-	mutex = malloc(sizeof(worker_mutex_t));
 	if(mutex == NULL) return -1;
+	if(mutex->initialized == 1) return -1;
+
 	mutex->initialized = 1;
 	mutex->locked = 0;
-	mutex->mutex_owner = curThread;
+	mutex->mutex_owner = curThread; //keep track of initializing thread
 	mutex->lock_owner = NULL;
+	printf("mutex initialized\n");
 
 	return 0;
 };
@@ -145,19 +138,28 @@ int worker_mutex_init(worker_mutex_t *mutex,
 /* aquire the mutex lock */
 int worker_mutex_lock(worker_mutex_t *mutex) {
 
-        // - use the built-in test-and-set atomic function to test the mutex
-        // - if the mutex is acquired successfully, enter the critical section
-        // - if acquiring mutex fails, push current thread into block list and
-        // context switch to the scheduler thread
+    // - use the built-in test-and-set atomic function to test the mutex
+    // - if the mutex is acquired successfully, enter the critical section
+    // - if acquiring mutex fails, push current thread into block list and
+    // context switch to the scheduler thread
 
-        // YOUR CODE HERE
+    // YOUR CODE HERE
+	if(mutex == NULL){ printf("mutex is null\n"); return -1; }
+	if(mutex->initialized == 0){ printf("mutex uninitialized\n"); return -1; }
 
-		if(mutex == NULL) return -1;
-		if(mutex != NULL){
-			if(mutex->locked == 1) return -1;
-		}
+	//will return initial value of mutex->locked
+	if(__atomic_test_and_set(&mutex->locked, 1)){ //if lock was acquired by another thread
+		printf("blocking thread %d\n", curThread->thread_id);
+		curThread->thread_status = blocked;
+		blockedQueue = enqueue(curThread, blockedQueue);
+		swapcontext(&curThread->context, &scheduler);
+	}
+	
+	//if lock can be acquired, keep track of lock owner
+	mutex->lock_owner = curThread;
+	//printf("locking mutex\n");
 
-        return 0;
+    return 0;
 };
 
 /* release the mutex lock */
@@ -165,8 +167,27 @@ int worker_mutex_unlock(worker_mutex_t *mutex) {
 	// - release mutex and make it available again. 
 	// - put threads in block list to run queue 
 	// so that they could compete for mutex later.
-
+	
 	// YOUR CODE HERE
+
+	if(mutex == NULL){ printf("mutex is null\n"); return -1; }
+	if(mutex->initialized == 0 || mutex->locked == 0){ printf("mutex locked or uninitialized\n"); return -1; }
+	if(mutex->lock_owner != curThread){ printf("access denied\n"); return -1; }
+
+	//remove threads from blocked queue and add to thread queue
+	while(!isEmpty(blockedQueue)){
+		printf("removing threads from blocked queue\n");
+		tcb* temp = blockedQueue;
+		temp->thread_status = ready;
+		enqueue(temp, threadQueue);
+		blockedQueue = blockedQueue->next;
+	}
+
+	//release the lock
+	mutex->locked = 0;
+	mutex->lock_owner = NULL;
+	//printf("unlocking mutex\n");
+
 	return 0;
 };
 
@@ -175,21 +196,22 @@ int worker_mutex_unlock(worker_mutex_t *mutex) {
 int worker_mutex_destroy(worker_mutex_t *mutex) {
 	// - de-allocate dynamic memory created in worker_mutex_init
 
+	//check for valid mutex and lock status
 	if(mutex == NULL) return -1;
-	if(mutex != NULL){
-		if(mutex->initialized == 0 || mutex->locked == 1) return -1;
-	}
-	if(mutex->mutex_owner == curThread){
-		free(mutex);
-		return 0;
-	}
+	if(mutex->initialized == 0 || mutex->locked == 1) return -1;
+	if(mutex->mutex_owner != curThread) return -1; //destroy mutex if current thread initialized it
 
-	return -1;
+	printf("destroying mutex\n");
+	mutex->initialized = 0;
+	mutex->mutex_owner = NULL;
+	mutex->locked = 0;
+	mutex->lock_owner = NULL;
+
+	return 0;
 };
 
 /* scheduler */
 static void schedule() {
-
 	if(DEBUG) printf("inside scheduler\n");
 	while(!isEmpty(threadQueue)) {
 		disable_timer();
@@ -199,7 +221,7 @@ static void schedule() {
 		enable_timer();
 		if(curThread != NULL) swapcontext(&scheduler, &curThread->context);
 		if(DEBUG)printQueue(threadQueue);
-		if(curThread->thread_status != terminated /*curThread->thread_status != blocked*/){ 
+		if(curThread->thread_status != terminated && curThread->thread_status != blocked){ 
 			curThread->thread_status = ready;
 			threadQueue = enqueue(curThread, threadQueue);
 		}
@@ -303,9 +325,9 @@ tcb* dequeue(tcb *queue) {
 
 static tcb* search(worker_t thread, tcb* queue) {
 	tcb* temp = queue;
-	while(queue != NULL) {
-		if(queue->thread_id == thread) return queue;
-		queue = queue->next;
+	while(temp != NULL) {
+		if(temp->thread_id == thread) return temp;
+		temp = temp->next;
 	}
 	return NULL;
 }

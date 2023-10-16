@@ -11,6 +11,9 @@
  * This will not be graded.
  */
 
+worker_mutex_t mutex;
+int x = 0;
+
 void fun(int c) {
 	for(int i=0; i<100000000; i++) {}
 	printf("first down\n");
@@ -26,17 +29,29 @@ void fun(int c) {
 	worker_exit(NULL);
 }
 
+void mutex_test(int x){
+	for(int i = 0; i < 10000; i++){
+		worker_mutex_lock(&mutex);
+		x++;
+		worker_mutex_unlock(&mutex);
+	}
+	worker_exit(NULL);
+}
+
 
 int main(int argc, char **argv) {
 	worker_t thread1, thread2, thread3;
-	int num1 = worker_create(&thread1, NULL, (void*)&fun, 6);
-	//int num2 = worker_create(&thread2, NULL, (void*)&fun, 6); 
-	//int num3 = worker_create(&thread2, NULL, (void*)&fun, 6); 
+	int mutex_retval = worker_mutex_init(&mutex, NULL);
+	int num1 = worker_create(&thread1, NULL, (void*)&mutex_test, 6);
+	int num2 = worker_create(&thread2, NULL, (void*)&mutex_test, 6); 
+	//int num3 = worker_create(&thread3, NULL, (void*)&fun, 6); 
 	worker_yield();
 	worker_join(thread1, NULL);
+	worker_join(thread2, NULL);
 	//worker_join(thread3, NULL);
+	worker_mutex_destroy(&mutex);
+	printf("%d\n", x);
 	printf("\nother thread\n");
-	//worker_join(thread2, NULL);
 	//while(1){}
 	return 0;
 }
