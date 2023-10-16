@@ -148,7 +148,7 @@ int worker_mutex_lock(worker_mutex_t *mutex) {
 	if(mutex->initialized == 0){ printf("mutex uninitialized\n"); return -1; }
 
 	//will return initial value of mutex->locked
-	if(__atomic_test_and_set(&mutex->locked, 1)){ //if lock was acquired by another thread
+	while(__atomic_test_and_set(&mutex->locked, 1)){ //if lock was acquired by another thread
 		printf("blocking thread %d\n", curThread->thread_id);
 		curThread->thread_status = blocked;
 		blockedQueue = enqueue(curThread, blockedQueue);
