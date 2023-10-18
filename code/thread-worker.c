@@ -29,6 +29,7 @@ double avg_resp_time=0;
 int thread_counter = 0; //counts # of threads
 tcb *threadQueue; //queue
 tcb *blockedQueue; //blocked queue (Sean)
+tcb *terminatedQueue; //terminated queue (Sean)
 //int threadQueueSize = 0; 
 ucontext_t scheduler; //context for scheduler
 ucontext_t benchmark; //context for benchmarks
@@ -103,9 +104,12 @@ int worker_join(worker_t thread, void **value_ptr) {
 	tcb *joining_thread = search(thread, threadQueue);
 	if(joining_thread == NULL){
 		joining_thread = search(thread, blockedQueue);
-		if(joining_thread == NULL) exit(0);
+		if(joining_thread == NULL) { 
+			joining_thread = search(thread, terminatedQueue);
+			if(joining_thread == NULL) {printf("join error: search returned null\n"); exit(1);}
+		}
 	}
-	if(DEBUG)printf("found %d, searched with %d", joining_thread->thread_id, thread);
+	if(DEBUG)printf("found %d, searched with %d\n", joining_thread->thread_id, thread);
 
 	while(joining_thread->thread_status != terminated) {swapcontext(&curThread->context, &scheduler);}
 
@@ -151,7 +155,6 @@ int worker_mutex_lock(worker_mutex_t *mutex) {
 	while(__atomic_test_and_set(&mutex->locked, 1)){ //if lock was acquired by another thread
 		printf("blocking thread %d\n", curThread->thread_id);
 		curThread->thread_status = blocked;
-		blockedQueue = enqueue(curThread, blockedQueue);
 		swapcontext(&curThread->context, &scheduler);
 	}
 	
@@ -224,6 +227,12 @@ static void schedule() {
 		if(curThread->thread_status != terminated && curThread->thread_status != blocked){ 
 			curThread->thread_status = ready;
 			threadQueue = enqueue(curThread, threadQueue);
+		}
+		else if(curThread->thread_status == blocked){
+			blockedQueue = enqueue(curThread, blockedQueue);
+		}
+		else if(curThread->thread_status == terminated){
+			terminatedQueue = enqueue(curThread, terminatedQueue);
 		}
 	}
 	// - every time a timer interrupt occurs, your worker thread library 
