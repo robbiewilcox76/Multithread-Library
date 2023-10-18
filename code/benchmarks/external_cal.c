@@ -144,6 +144,7 @@ int main(int argc, char **argv) {
 	pthread_mutex_destroy(&mutex);
 
 	// feel free to verify your answer here:
+	int x = sum;
 	verify();
 	
 	free(mem);
@@ -152,6 +153,7 @@ int main(int argc, char **argv) {
 
 #ifdef USE_WORKERS
 	fprintf(stderr , "Total sum is: %d\n", sum);
+	printf(" %d ", x);
         print_app_stats();
 	fprintf(stderr, "***************************\n");
 #endif
