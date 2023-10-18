@@ -113,6 +113,7 @@ int worker_join(worker_t thread, void **value_ptr) {
 
 	while(joining_thread->thread_status != terminated) {swapcontext(&curThread->context, &scheduler);}
 
+	//terminatedQueue = terminatedQueue->next;
 	if(value_ptr) *value_ptr = joining_thread->return_value; //save return value
 	if(joining_thread->stack) free(joining_thread->stack); //free thread memory
 	free(joining_thread);
@@ -174,16 +175,17 @@ int worker_mutex_unlock(worker_mutex_t *mutex) {
 	// YOUR CODE HERE
 
 	if(mutex == NULL){ printf("mutex is null\n"); return -1; }
-	if(mutex->initialized == 0 || mutex->locked == 0){ printf("mutex locked or uninitialized\n"); return -1; }
+	if(mutex->initialized == 0 || mutex->locked == 0){ printf("mutex unlocked or uninitialized\n"); return -1; }
 	if(mutex->lock_owner != curThread){ printf("access denied\n"); return -1; }
 
 	//remove threads from blocked queue and add to thread queue
 	while(!isEmpty(blockedQueue)){
 		printf("removing threads from blocked queue\n");
 		tcb* temp = blockedQueue;
+		blockedQueue = blockedQueue->next;
 		temp->thread_status = ready;
 		enqueue(temp, threadQueue);
-		blockedQueue = blockedQueue->next;
+		if(DEBUG) {printf("thread queue: "); printQueue(threadQueue);}
 	}
 
 	//release the lock
@@ -223,16 +225,18 @@ static void schedule() {
 		curThread->thread_status = running;
 		enable_timer();
 		if(curThread != NULL) swapcontext(&scheduler, &curThread->context);
-		if(DEBUG)printQueue(threadQueue);
+		if(DEBUG) {printf("thread queue: "); printQueue(threadQueue);}
 		if(curThread->thread_status != terminated && curThread->thread_status != blocked){ 
 			curThread->thread_status = ready;
 			threadQueue = enqueue(curThread, threadQueue);
 		}
 		else if(curThread->thread_status == blocked){
 			blockedQueue = enqueue(curThread, blockedQueue);
+			if(DEBUG) {printf("blocked queue: "); printQueue(blockedQueue);}
 		}
 		else if(curThread->thread_status == terminated){
 			terminatedQueue = enqueue(curThread, terminatedQueue);
+			if(DEBUG) {printf("terminated queue: "); printQueue(terminatedQueue);}
 		}
 	}
 	// - every time a timer interrupt occurs, your worker thread library 

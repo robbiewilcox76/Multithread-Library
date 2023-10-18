@@ -40,15 +40,19 @@ void mutex_test(int *a){
 
 
 int main(int argc, char **argv) {
-	worker_t thread1, thread2, thread3;
+	worker_t thread1, thread2, thread3, thread4, thread5;
 	int mutex_retval = worker_mutex_init(&mutex, NULL);
 	int num1 = worker_create(&thread1, NULL, (void*)&mutex_test, 6);
 	int num2 = worker_create(&thread2, NULL, (void*)&mutex_test, 6); 
 	int num3 = worker_create(&thread3, NULL, (void*)&mutex_test, 6); 
+	int num4 = worker_create(&thread4, NULL, (void*)&mutex_test, 6);
+	int num5 = worker_create(&thread5, NULL, (void*)&mutex_test, 6);
 	worker_yield();
 	worker_join(thread1, NULL);
 	worker_join(thread2, NULL);
 	worker_join(thread3, NULL);
+	worker_join(thread4, NULL);
+	worker_join(thread5, NULL);
 	worker_mutex_destroy(&mutex);
 	printf("%d\n", x);
 	printf("\nother thread\n");
