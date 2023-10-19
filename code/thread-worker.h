@@ -11,8 +11,9 @@
 
 /* To use Linux pthread Library in Benchmark, you have to comment the USE_WORKERS macro */
 #define USE_WORKERS 1
-#define TIME_S 1/100
-#define TIME_US 100000
+#define TIME_QUANTUM 10
+#define TIME_S TIME_QUANTUM / 1000
+#define TIME_US (TIME_QUANTUM * 1000) % 100000
 
 /* include lib header files that you need here: */
 #include <unistd.h>
@@ -40,6 +41,7 @@ typedef struct TCB {
 	ucontext_t context;
 	void* stack;
 	int priority;
+	int quantums_elapsed;
 	struct TCB* next;
 	void* return_value;
 
@@ -52,7 +54,6 @@ typedef struct worker_mutex_t {
 	// YOUR CODE HERE
 	volatile int initialized; //is mutex initialized
 	volatile int locked; //is mutex lock currently locked
-	tcb* mutex_owner;
 	tcb* lock_owner; //pointer to TCB owner of current mutex lock
 
 } worker_mutex_t;
@@ -94,8 +95,25 @@ int worker_mutex_destroy(worker_mutex_t *mutex);
 /* Function to print global statistics. Do not modify this function.*/
 void print_app_stats(void);
 
+static void sched_psjf();
+static void sched_mlfq();
+
 
 //---------------------Util methods we made-------------------------// 
+/* Signal handler for timer interrupts */
+static void signal_handler();
+
+/* Enables signal handler timer */
+static void enable_timer();
+
+/* Disables signal handler timer*/
+static void disable_timer();
+
+/* Initialize thread control block data for worker thread */
+static void create_tcb(worker_t * thread, tcb* control_block, void *(*function)(void*), void * arg);
+
+/* Search queue for specified thread */
+static tcb* search(worker_t thread, tcb* queue);
 
 /* Function to add new thread to queue.*/
 tcb* enqueue(tcb *thread, tcb *queue);
