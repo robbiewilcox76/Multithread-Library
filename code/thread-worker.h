@@ -13,7 +13,7 @@
 #define USE_WORKERS 1
 #define TIME_QUANTUM 10
 #define TIME_S TIME_QUANTUM / 1000
-#define TIME_US (TIME_QUANTUM * 1000) % 100000
+#define TIME_US (TIME_QUANTUM * 1000) % 1000000
 
 /* include lib header files that you need here: */
 #include <unistd.h>
