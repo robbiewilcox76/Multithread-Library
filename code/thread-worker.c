@@ -46,6 +46,7 @@ tcb *threadQueue_level_4;
 tcb *blockedQueue; 
 /* Terminated thread queue*/
 tcb *terminatedQueue; 
+//tcb* testQueue;
 
 /* Thread 1 is the main thread */
 
@@ -82,6 +83,7 @@ int worker_yield() {
 	if(curThread != NULL) {
 		if(DEBUG) printf("yielding...");
 		curThread->thread_status = ready;
+		//curThread->context_switches++;
 		tot_cntx_switches++;
 		swapcontext(&curThread->context, &scheduler);
 	}
@@ -115,10 +117,11 @@ int worker_join(worker_t thread, void **value_ptr) {
 	}
 	if(DEBUG)printf("found %d, searched with %d\n", joining_thread->thread_id, thread);
 
-	while(joining_thread->thread_status != terminated) { tot_cntx_switches++; swapcontext(&curThread->context, &scheduler); }
+	while(joining_thread->thread_status != terminated) { curThread->context_switches++; swapcontext(&curThread->context, &scheduler); }
 
 	//terminatedQueue = terminatedQueue->next;
 	if(value_ptr) *value_ptr = joining_thread->return_value; //save return value
+	//tot_cntx_switches += joining_thread->context_switches;
 	if(joining_thread->stack) free(joining_thread->stack); //free thread memory
 	free(joining_thread);
 
@@ -159,6 +162,7 @@ int worker_mutex_lock(worker_mutex_t *mutex) {
 	while(__atomic_test_and_set(&mutex->locked, 1)){ //if lock was acquired by another thread
 		if(DEBUG) printf("blocking thread %d\n", curThread->thread_id);
 		curThread->thread_status = blocked;
+		//curThread->context_switches++;
 		tot_cntx_switches++;
 		swapcontext(&curThread->context, &scheduler);
 	}
@@ -188,7 +192,7 @@ int worker_mutex_unlock(worker_mutex_t *mutex) {
 		tcb* temp = blockedQueue;
 		blockedQueue = blockedQueue->next;
 		temp->thread_status = ready;
-		enqueue(temp, threadQueue);
+		threadQueue = enqueue(temp, threadQueue);
 		if(DEBUG) {printf("thread queue: "); printQueue(threadQueue);}
 	}
 
@@ -219,15 +223,36 @@ int worker_mutex_destroy(worker_mutex_t *mutex) {
 
 /* scheduler */
 static void schedule() {
+	// - every time a timer interrupt occurs, your worker thread library 
+	// should be contexted switched from a thread context to this 
+	// schedule() function
+
+	// - invoke scheduling algorithms according to the policy (PSJF or MLFQ)
+
+	// if (sched == PSJF)
+	//		sched_psjf();
+	// else if (sched == MLFQ)
+	// 		sched_mlfq();
+
+	// YOUR CODE HERE
+
 	if(DEBUG) printf("inside scheduler\n");
 	while(!isEmpty(threadQueue)) {
 		disable_timer();
-		threadQueue = dequeue(threadQueue);
+		// - schedule policy
+		#ifndef MLFQ
+			sched_psjf();
+		#else 
+			sched_mlfq();
+		#endif
+		
+		//if(curThread->thread_id == 1) {tot_cntx_switches += curThread->context_switches; curThread->context_switches = 0;}
 		if(DEBUG) printf("swapping to thread %d\n", curThread->thread_id);
 		curThread->thread_status = running;
 		enable_timer();
 		if(curThread != NULL) { 
-			tot_cntx_switches++; 
+			//curThread->context_switches++; 
+			tot_cntx_switches++;
 			swapcontext(&scheduler, &curThread->context);
 			curThread->quantums_elapsed++;
 		}
@@ -245,26 +270,6 @@ static void schedule() {
 			if(DEBUG) {printf("terminated queue: "); printQueue(terminatedQueue);}
 		}
 	}
-	// - every time a timer interrupt occurs, your worker thread library 
-	// should be contexted switched from a thread context to this 
-	// schedule() function
-
-	// - invoke scheduling algorithms according to the policy (PSJF or MLFQ)
-
-	// if (sched == PSJF)
-	//		sched_psjf();
-	// else if (sched == MLFQ)
-	// 		sched_mlfq();
-
-	// YOUR CODE HERE
-
-// - schedule policy
-#ifndef MLFQ
-	sched_psjf();
-#else 
-	sched_mlfq();
-#endif
-
 }
 
 /* Pre-emptive Shortest Job First (POLICY_PSJF) scheduling algorithm */
@@ -274,7 +279,7 @@ static void sched_psjf() {
 
 	// YOUR CODE HERE
 
-	//need to find thread with lowest quantums elapsed
+	threadQueue = dequeuePSJF(threadQueue);
 }
 
 
@@ -325,6 +330,7 @@ static void create_tcb(worker_t * thread, tcb* control_block, void *(*function)(
 	control_block->thread_status = ready;
 	control_block->priority = 0; //don't know what to do with this, we're not there yet
 	control_block->quantums_elapsed = 0;
+	control_block->context_switches = 0;
 	makecontext(&control_block->context,(void *)function, 1, arg);
 }
 
@@ -343,6 +349,31 @@ tcb* dequeue(tcb *queue) {
 	curThread = queue;
 	queue = queue->next;
 	return queue;
+}
+
+tcb* dequeuePSJF(tcb *queue){
+	if(isEmpty(queue)) return NULL;
+	tcb* target = queue; //head of queue
+	tcb* cur = queue;
+	tcb* prev = queue;
+	while(cur != NULL){ //find thread with lowest quantums elapsed
+		if(cur->quantums_elapsed < target->quantums_elapsed) target = cur;
+		else {
+			if(prev->next != target) prev = cur;
+		}
+		cur = cur->next;
+	}
+	if(target == queue){ //if only 1 thread in queue or if head had lowest quantums elapsed
+		queue = dequeue(queue);
+		return queue;
+	}
+	curThread = target;
+	//remove target thread from queue
+	prev->next = target->next;
+	return queue;
+}
+tcb* dequeueMLFQ(tcb *queue){
+	return NULL;
 }
 
 static tcb* search(worker_t thread, tcb* queue) {
@@ -374,6 +405,7 @@ void toString(tcb *thread) {
 static void signal_handler(int signum) {
 	if(DEBUG) puts("signal received\n");
 	if(curThread != NULL ) {
+		//curThread->context_switches++;
 		tot_cntx_switches++;
 		swapcontext(&curThread->context, &scheduler);
 	}
@@ -440,6 +472,7 @@ int scheduler_benchmark_create_context() {
 	mainTCB->priority = 0; //don't know what to do with this, we're not there yet
 	mainTCB->quantums_elapsed = 0;
 	threadQueue = enqueue(mainTCB, threadQueue);
+	//mainTCB->context_switches++;
 	tot_cntx_switches++;
 	swapcontext(&mainTCB->context, &scheduler);
 	return 0;

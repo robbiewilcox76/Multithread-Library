@@ -11,9 +11,9 @@
 
 /* To use Linux pthread Library in Benchmark, you have to comment the USE_WORKERS macro */
 #define USE_WORKERS 1
-#define TIME_QUANTUM 10
-#define TIME_S TIME_QUANTUM / 1000
-#define TIME_US (TIME_QUANTUM * 1000) % 1000000
+#define QUANTUM 10
+#define TIME_S QUANTUM / 1000
+#define TIME_US (QUANTUM * 1000) % 1000000
 
 /* include lib header files that you need here: */
 #include <unistd.h>
@@ -42,6 +42,7 @@ typedef struct TCB {
 	void* stack;
 	int priority;
 	int quantums_elapsed;
+	int context_switches;
 	struct TCB* next;
 	void* return_value;
 
@@ -118,9 +119,16 @@ static tcb* search(worker_t thread, tcb* queue);
 /* Function to add new thread to queue.*/
 tcb* enqueue(tcb *thread, tcb *queue);
 
-/* Function to remove thread .*/
+/* Function to remove thread (RR scheduling).*/
 tcb* dequeue(tcb *queue);
 
+/* Function to remove thread with PSJF scheduling */
+tcb* dequeuePSJF(tcb *queue);
+
+/* Function to remove thread with MLFQ scheduling */
+tcb* dequeueMLFQ(tcb *queue);
+
+/* Checks if specified queue is empty */
 int isEmpty(tcb *threadQueue);
 
 /* Function to print thread queue.*/

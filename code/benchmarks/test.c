@@ -30,7 +30,7 @@ void fun(int c) {
 }
 
 void mutex_test(int *a){
-	for(int i = 0; i < 10000000; i++){
+	for(int i = 0; i < 1000000; i++){
 		worker_mutex_lock(&mutex);
 		x++;
 		worker_mutex_unlock(&mutex);
@@ -46,7 +46,7 @@ int main(int argc, char **argv) {
 	int num2 = worker_create(&thread2, NULL, (void*)&mutex_test, 6); 
 	int num3 = worker_create(&thread3, NULL, (void*)&mutex_test, 6); 
 	int num4 = worker_create(&thread4, NULL, (void*)&mutex_test, 6);
-	//int num5 = worker_create(&thread5, NULL, (void*)&mutex_test, 6);
+	int num5 = worker_create(&thread5, NULL, (void*)&mutex_test, 6);
 	//int num6 = worker_create(&thread6, NULL, (void*)&mutex_test, 6);
 	//int num7 = worker_create(&thread7, NULL, (void*)&mutex_test, 6); 
 	//int num8 = worker_create(&thread8, NULL, (void*)&mutex_test, 6); 
@@ -57,7 +57,7 @@ int main(int argc, char **argv) {
 	worker_join(thread2, NULL);
 	worker_join(thread3, NULL);
 	worker_join(thread4, NULL);
-	//worker_join(thread5, NULL);
+	worker_join(thread5, NULL);
 	//worker_join(thread6, NULL);
 	//worker_join(thread7, NULL);
 	//worker_join(thread8, NULL);
@@ -66,6 +66,7 @@ int main(int argc, char **argv) {
 	worker_mutex_destroy(&mutex);
 	printf("%d\n", x);
 	printf("\nother thread\n");
+	print_app_stats();
 	//while(1){}
 	return 0;
 }
