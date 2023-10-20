@@ -117,7 +117,11 @@ int worker_join(worker_t thread, void **value_ptr) {
 	}
 	if(DEBUG)printf("found %d, searched with %d\n", joining_thread->thread_id, thread);
 
-	while(joining_thread->thread_status != terminated) { curThread->context_switches++; swapcontext(&curThread->context, &scheduler); }
+	while(joining_thread->thread_status != terminated) { 
+		//curThread->context_switches++; 
+		tot_cntx_switches++;
+		swapcontext(&curThread->context, &scheduler); 
+	}
 
 	//terminatedQueue = terminatedQueue->next;
 	if(value_ptr) *value_ptr = joining_thread->return_value; //save return value
