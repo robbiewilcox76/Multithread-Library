@@ -359,12 +359,8 @@ tcb* dequeuePSJF(tcb *queue){
 	if(isEmpty(queue)) return NULL;
 	tcb* target = queue; //head of queue
 	tcb* cur = queue;
-	tcb* prev = queue;
 	while(cur != NULL){ //find thread with lowest quantums elapsed
 		if(cur->quantums_elapsed < target->quantums_elapsed) target = cur;
-		else {
-			if(prev->next != target) prev = cur;
-		}
 		cur = cur->next;
 	}
 	if(target == queue){ //if only 1 thread in queue or if head had lowest quantums elapsed
@@ -372,6 +368,11 @@ tcb* dequeuePSJF(tcb *queue){
 		return queue;
 	}
 	curThread = target;
+	tcb* prev = queue;
+	//find thread before target thread in queue
+	while(prev->next != target){
+		prev = prev->next;
+	}
 	//remove target thread from queue
 	prev->next = target->next;
 	return queue;
