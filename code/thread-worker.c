@@ -11,6 +11,7 @@
 #include <string.h>
 #include <ucontext.h>
 #include <sys/time.h>
+#include <time.h>
 #include "thread-worker.h"
 
 #define STACK_SIZE SIGSTKSZ
@@ -21,6 +22,9 @@
 long tot_cntx_switches=0;
 double avg_turn_time=0;
 double avg_resp_time=0;
+
+double tot_resp_time=0;
+double tot_turn_time=0;
 
 // INITAILIZE ALL YOUR OTHER VARIABLES HERE
 // YOUR CODE HERE
@@ -97,6 +101,15 @@ void worker_exit(void *value_ptr) {
 	disable_timer();
 	curThread->thread_status = terminated;
 	if(value_ptr) curThread->return_value = value_ptr;
+	if(!curThread->end_time) curThread->end_time = clock();
+	curThread->response_time = curThread->start_time - curThread->queued_time;
+	curThread->turnaround_time = curThread->end_time - curThread->queued_time;
+	tot_resp_time += curThread->response_time;
+	tot_turn_time += curThread->turnaround_time;
+	avg_resp_time = tot_resp_time/thread_counter;
+	avg_turn_time = tot_turn_time/thread_counter;
+
+	if(DEBUG)printf("\nresponse: %ld\nturnaround: %ld\n", curThread->response_time, curThread->turnaround_time);
 };
 
 
@@ -249,7 +262,7 @@ static void schedule() {
 		#else 
 			sched_mlfq();
 		#endif
-		
+		if(!curThread->start_time) curThread->start_time = clock();
 		//if(curThread->thread_id == 1) {tot_cntx_switches += curThread->context_switches; curThread->context_switches = 0;}
 		if(DEBUG) printf("swapping to thread %d\n", curThread->thread_id);
 		curThread->thread_status = running;
@@ -346,6 +359,8 @@ tcb* enqueue(tcb *thread, tcb *queue) {
 		temp->next = thread;
 	}
 	thread->next = NULL;
+	if(!thread->queued_time) thread->queued_time = clock();
+	if(DEBUG)printf("\ntime is %ld \n", thread->queued_time);
 	return queue;
 }
 

@@ -22,6 +22,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <ucontext.h>
+#include <time.h>
 
 typedef uint worker_t;
 typedef enum status {ready, running, blocked, terminated} status;
@@ -45,6 +46,11 @@ typedef struct TCB {
 	int context_switches;
 	struct TCB* next;
 	void* return_value;
+	clock_t queued_time;
+	clock_t start_time;
+	clock_t end_time;
+	long response_time;
+	long turnaround_time;
 
 } tcb; 
 
