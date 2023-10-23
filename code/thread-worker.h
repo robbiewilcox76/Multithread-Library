@@ -43,7 +43,6 @@ typedef struct TCB {
 	void* stack;
 	int priority;
 	int quantums_elapsed;
-	int context_switches;
 	struct TCB* next;
 	void* return_value;
 	clock_t queued_time;
@@ -125,6 +124,9 @@ static tcb* search(worker_t thread, tcb* queue);
 /* Function to add new thread to queue.*/
 tcb* enqueue(tcb *thread, tcb *queue);
 
+/* Function to add thread to appropriate level of MLFQ */
+void enqueueMLFQ(tcb* thread);
+
 /* Function to remove thread (RR scheduling).*/
 tcb* dequeue(tcb *queue);
 
@@ -134,8 +136,14 @@ tcb* dequeuePSJF(tcb *queue);
 /* Function to remove thread with MLFQ scheduling */
 tcb* dequeueMLFQ(tcb *queue);
 
+/* Function to reset MLFQ and thread priorities */
+void resetMLFQ();
+
 /* Checks if specified queue is empty */
 int isEmpty(tcb *threadQueue);
+
+/* Checks if entire MLFQ is empty */
+int areQueuesEmpty();
 
 /* Function to print thread queue.*/
 void printQueue(tcb *queue);
@@ -162,3 +170,4 @@ int scheduler_benchmark_create_context();
 #endif
 
 #endif
+

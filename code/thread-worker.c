@@ -50,7 +50,8 @@ tcb *threadQueue_level_4;
 tcb *blockedQueue; 
 /* Terminated thread queue*/
 tcb *terminatedQueue; 
-//tcb* testQueue;
+/* How many quantums have elasped in total */
+int total_quantums_elapsed;
 
 /* Thread 1 is the main thread */
 
@@ -87,7 +88,6 @@ int worker_yield() {
 	if(curThread != NULL) {
 		if(DEBUG) printf("yielding...");
 		curThread->thread_status = ready;
-		//curThread->context_switches++;
 		tot_cntx_switches++;
 		swapcontext(&curThread->context, &scheduler);
 	}
@@ -127,20 +127,25 @@ int worker_join(worker_t thread, void **value_ptr) {
 		joining_thread = search(thread, blockedQueue);
 		if(joining_thread == NULL) { 
 			joining_thread = search(thread, terminatedQueue);
-			if(joining_thread == NULL) { if(DEBUG) printf("join error: search returned null\n"); exit(1);}
+			if(joining_thread == NULL) { 
+				joining_thread = search(thread, threadQueue_level_2);
+				if(joining_thread == NULL){
+					joining_thread = search(thread, threadQueue_level_3);
+					if(joining_thread == NULL){
+						joining_thread = search(thread, threadQueue_level_4);
+						if(joining_thread == NULL){ if(DEBUG) printf("join error: search returned null\n"); exit(1);}
+					}
+				}
+			}
 		}
 	}
 	if(DEBUG)printf("found %d, searched with %d\n", joining_thread->thread_id, thread);
 
 	while(joining_thread->thread_status != terminated) { 
-		//curThread->context_switches++; 
-		tot_cntx_switches++;
-		swapcontext(&curThread->context, &scheduler); 
+		
 	}
 
-	//terminatedQueue = terminatedQueue->next;
 	if(value_ptr) *value_ptr = joining_thread->return_value; //save return value
-	//tot_cntx_switches += joining_thread->context_switches;
 	if(joining_thread->stack) free(joining_thread->stack); //free thread memory
 	free(joining_thread);
 
@@ -181,7 +186,6 @@ int worker_mutex_lock(worker_mutex_t *mutex) {
 	while(__atomic_test_and_set(&mutex->locked, 1)){ //if lock was acquired by another thread
 		if(DEBUG) printf("blocking thread %d\n", curThread->thread_id);
 		curThread->thread_status = blocked;
-		//curThread->context_switches++;
 		tot_cntx_switches++;
 		swapcontext(&curThread->context, &scheduler);
 	}
@@ -256,7 +260,7 @@ static void schedule() {
 	// YOUR CODE HERE
 
 	if(DEBUG) printf("inside scheduler\n");
-	while(!isEmpty(threadQueue)) {
+	while(!areQueuesEmpty()) {
 		disable_timer();
 		// - schedule policy
 		#ifndef MLFQ
@@ -265,12 +269,10 @@ static void schedule() {
 			sched_mlfq();
 		#endif
 		if(!curThread->start_time) curThread->start_time = clock();
-		//if(curThread->thread_id == 1) {tot_cntx_switches += curThread->context_switches; curThread->context_switches = 0;}
 		if(DEBUG) printf("swapping to thread %d\n", curThread->thread_id);
 		curThread->thread_status = running;
 		enable_timer();
 		if(curThread != NULL) { 
-			//curThread->context_switches++; 
 			tot_cntx_switches++;
 			swapcontext(&scheduler, &curThread->context);
 			curThread->quantums_elapsed++;
@@ -278,7 +280,11 @@ static void schedule() {
 		if(DEBUG) {printf("thread queue: "); printQueue(threadQueue);}
 		if(curThread->thread_status != terminated && curThread->thread_status != blocked){ 
 			curThread->thread_status = ready;
-			threadQueue = enqueue(curThread, threadQueue);
+			#ifndef MLFQ 
+				threadQueue = enqueue(curThread, threadQueue);
+			#else
+				enqueueMLFQ(curThread);
+			#endif
 		}
 		else if(curThread->thread_status == blocked){
 			blockedQueue = enqueue(curThread, blockedQueue);
@@ -308,6 +314,10 @@ static void sched_mlfq() {
 	// (feel free to modify arguments and return types)
 
 	// YOUR CODE HERE
+	if(!isEmpty(threadQueue)) threadQueue = dequeue(threadQueue);
+	else if(!isEmpty(threadQueue_level_2)) threadQueue_level_2 = dequeue(threadQueue_level_2);
+	else if(!isEmpty(threadQueue_level_3)) threadQueue_level_3 = dequeue(threadQueue_level_3);
+	else if(!isEmpty(threadQueue_level_4)) threadQueue_level_4 = dequeue(threadQueue_level_4);
 }
 
 //DO NOT MODIFY THIS FUNCTION
@@ -347,9 +357,8 @@ static void create_tcb(worker_t * thread, tcb* control_block, void *(*function)(
 	*thread = control_block->thread_id;
 	thread_counter++;
 	control_block->thread_status = ready;
-	control_block->priority = 0; //don't know what to do with this, we're not there yet
+	control_block->priority = 0; 
 	control_block->quantums_elapsed = 0;
-	control_block->context_switches = 0;
 	makecontext(&control_block->context,(void *)function, 1, arg);
 }
 
@@ -364,6 +373,26 @@ tcb* enqueue(tcb *thread, tcb *queue) {
 	if(!thread->queued_time) thread->queued_time = clock();
 	if(DEBUG)printf("\ntime is %ld \n", thread->queued_time);
 	return queue;
+}
+
+void enqueueMLFQ(tcb* thread){
+	switch(thread->priority){
+		case(0):
+			threadQueue = enqueue(thread, threadQueue);
+			break;
+		case(1):
+			threadQueue_level_2 = enqueue(thread, threadQueue_level_2);
+			break;
+		case(2):
+			threadQueue_level_3 = enqueue(thread, threadQueue_level_3);
+			break;
+		case(3):
+			threadQueue_level_4 = enqueue(thread, threadQueue_level_4);
+			break;
+		default:
+			threadQueue = enqueue(thread, threadQueue);
+			break;
+	}
 }
 
 tcb* dequeue(tcb *queue) {
@@ -394,8 +423,35 @@ tcb* dequeuePSJF(tcb *queue){
 	prev->next = target->next;
 	return queue;
 }
-tcb* dequeueMLFQ(tcb *queue){
-	return NULL;
+
+void resetMLFQ(){
+	if(curThread != NULL) curThread->priority = 0;
+	tcb* blockedTemp = blockedQueue;
+	while(blockedTemp != NULL){
+		blockedTemp->priority = 0;
+		blockedTemp = blockedTemp->next;
+	}
+	tcb* temp = threadQueue_level_2;
+	while(threadQueue_level_2 != NULL){
+		temp->priority = 0;
+		threadQueue_level_2 = threadQueue_level_2->next;
+		threadQueue = enqueue(temp, threadQueue);
+		temp = threadQueue_level_2;
+	}
+	temp = threadQueue_level_3;
+	while(threadQueue_level_3 != NULL){
+		temp->priority;
+		threadQueue_level_3 = threadQueue_level_3->next;
+		threadQueue = enqueue(temp, threadQueue);
+		temp = threadQueue_level_3;
+	}
+	temp = threadQueue_level_4;
+	while(threadQueue_level_4 != NULL){
+		temp->priority = 0;
+		threadQueue_level_4 = threadQueue_level_4->next;
+		threadQueue = enqueue(temp, threadQueue);
+		temp = threadQueue_level_4;
+	}
 }
 
 static tcb* search(worker_t thread, tcb* queue) {
@@ -409,6 +465,11 @@ static tcb* search(worker_t thread, tcb* queue) {
 
 int isEmpty(tcb *queue) {
 	return queue == NULL;
+}
+
+int areQueuesEmpty(){
+	if(isEmpty(threadQueue) && isEmpty(threadQueue_level_2) && isEmpty(threadQueue_level_3) && isEmpty(threadQueue_level_4)) return 1;
+	return 0;
 }
 
 void printQueue(tcb *queue) {
@@ -426,8 +487,17 @@ void toString(tcb *thread) {
 
 static void signal_handler(int signum) {
 	if(DEBUG) puts("signal received\n");
-	if(curThread != NULL ) {
-		//curThread->context_switches++;
+
+	if(curThread != NULL ){
+		#ifndef MLFQ 
+		#else
+			if(curThread->priority < 3) curThread->priority++;
+			total_quantums_elapsed++;
+			if(total_quantums_elapsed >= 10){
+				total_quantums_elapsed = 0;
+				resetMLFQ();
+			}
+		#endif
 		tot_cntx_switches++;
 		swapcontext(&curThread->context, &scheduler);
 	}
@@ -494,7 +564,6 @@ int scheduler_benchmark_create_context() {
 	mainTCB->priority = 0; //don't know what to do with this, we're not there yet
 	mainTCB->quantums_elapsed = 0;
 	threadQueue = enqueue(mainTCB, threadQueue);
-	//mainTCB->context_switches++;
 	tot_cntx_switches++;
 	swapcontext(&mainTCB->context, &scheduler);
 	return 0;
