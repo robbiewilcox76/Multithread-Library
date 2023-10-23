@@ -153,7 +153,6 @@ int main(int argc, char **argv) {
 
 #ifdef USE_WORKERS
 	fprintf(stderr , "Total sum is: %d\n", sum);
-	printf(" %d ", x);
         print_app_stats();
 	fprintf(stderr, "***************************\n");
 #endif

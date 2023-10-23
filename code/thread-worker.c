@@ -1,4 +1,4 @@
-// File:	thread-worker.c
+// File:	thread-worker.ccontext_switches
 
 // List all group member's name: Fulton Wilcox III, Sean Patrick
 // username of iLab: frw14, smp429
@@ -15,7 +15,7 @@
 #include "thread-worker.h"
 
 #define STACK_SIZE SIGSTKSZ
-#define DEBUG 1
+#define DEBUG 0
 
 //Global counter for total context switches and 
 //average turn around and response time
@@ -102,8 +102,10 @@ void worker_exit(void *value_ptr) {
 	curThread->thread_status = terminated;
 	if(value_ptr) curThread->return_value = value_ptr;
 	if(!curThread->end_time) curThread->end_time = clock();
-	curThread->response_time = curThread->start_time - curThread->queued_time;
-	curThread->turnaround_time = curThread->end_time - curThread->queued_time;
+
+	curThread->response_time = ((curThread->start_time - curThread->queued_time) * 1000)/CLOCKS_PER_SEC;
+	curThread->turnaround_time = ((curThread->end_time - curThread->queued_time) * 1000)/CLOCKS_PER_SEC;
+
 	tot_resp_time += curThread->response_time;
 	tot_turn_time += curThread->turnaround_time;
 	avg_resp_time = tot_resp_time/thread_counter;
@@ -227,8 +229,8 @@ int worker_mutex_destroy(worker_mutex_t *mutex) {
 	// - de-allocate dynamic memory created in worker_mutex_init
 
 	//check for valid mutex and lock status
-	if(mutex == NULL) {printf("mutex is null\n"); return -1;}
-	if(mutex->initialized == 0 || mutex->locked == 1) {printf("mutex locked or uninitialized\n"); return -1;}
+	if(mutex == NULL) {if(DEBUG)printf("mutex is null\n"); return -1;}
+	if(mutex->initialized == 0 || mutex->locked == 1) {if(DEBUG)printf("mutex locked or uninitialized\n"); return -1;}
 
 	if(DEBUG) printf("destroying mutex\n");
 	mutex->initialized = 0;
