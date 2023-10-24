@@ -497,8 +497,7 @@ static void signal_handler(int signum) {
 	if(curThread != NULL ){
 		#ifdef MLFQ 
 			if(curThread->priority < 3) curThread->priority++;
-			total_quantums_elapsed++;
-			if(total_quantums_elapsed >= S){
+			if(++total_quantums_elapsed >= S){
 				total_quantums_elapsed = 0;
 				resetMLFQ();
 			}
