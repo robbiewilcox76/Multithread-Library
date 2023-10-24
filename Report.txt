@@ -1,55 +1,57 @@
 Fulton Wilcox (frw14) & Sean Patrick (smp429)
-Project Report
-
-Need to submit as PDF
+Project 2 - User-Level Thread Library and Scheduler - Report
 
 1)
 API Implementation:
 
 int worker_create(worker_t * thread, pthread_attr_t * attr, void *(*function)(void*), void * arg):
 
-    The job of worker_create is to create the tcb for a worker thread and initialize the main context and shceduler context if it is the first call of the session.
+    The job of worker_create is to create the tcb for a worker thread and initialize the main context and scheduler context if it is the first call of the session.
     The first thing that is done is allocate the memory for the tcb, call create_tcb which initializes its fields and makes it ready to run, and add it to the runqueue.
     If this is the first call of worker_create of the session, there will also be a call to create the scheduler and main benchmark threads. 
 
-    
 int worker_yield():
 
     worker_yield turns over control of the process to the scheduler, taking away control from the currently running thread.  The tcb's status field is changed back to 
     "ready" from "running", and the context is swapped back to the scheduler context.
 
-    
 void worker_exit(void *value_ptr):
 
     worker_exit is the mechanism by which a thread should terminate according to the framework of this library.  The argument, a void pointer, is passed in to store the return
     value of the function if there is one.  the status of the thread is changed to "terminated" from "running" and the time is recorded and saved in the tcb for the app statistics.
     The turnaround and response time is also recorded, and the average response and turnaround time updated.  
 
-    
 int worker_join(worker_t thread, void **value_ptr):
 
     worker_join blocks the calling thread until the thread whose thread id is passed into the function terminates.  First, the thread that is passed into the function is found by
     searching through the queues, and the function lingers until the status of this thread is terminated.  Once it is terminated, we know the thread can now continue, 
-    so the function can return. The return value, if the function isn't void, is also storted in value_ptr.
+    so the function can return. The return value, if the function isn't void, is also stored in value_ptr.
     
 int worker_mutex_init(worker_mutex_t *mutex, const pthread_mutexattr_t *mutexattr):
 
+    worker_mutex_init initializes the worker_mutex_t structure by initializing the fields appropriately so that the worker threads can then use the worker_mutex_t for synchronization.
     
 int worker_mutex_lock(worker_mutex_t *mutex):
 
+    worker_mutex_lock uses the built in __atomic_test_and_set() function to set the lock field of the worker_mutex_t to 1. This function returns the initial value of worker_mutex_t->locked
+    and checks this initial value by using a while loop so that the thread will remain in this loop upon context switches until the lock is released. If the thread does not have access to
+    the lock, its status is set to blocked and the context is then switched to the scheduler, which will enqueue the thread into the blocked queue instead of the run queue.
+    If the thread has access to the lock, the thread will be pointed to by the worker_mutex_t->lockOwner field and then the thread will have access to the subsequent critical section.
     
 int worker_mutex_unlock(worker_mutex_t *mutex):
 
+    worker_mutex_unlock will check if the thread calling it is the owner of the lock, and if it is, it will set the worker_mutex_t fields appropriately and it will remove the thread 
+    at the head of the blocked queue and enqueue it to the run queue.
     
 int worker_mutex_destroy(worker_mutex_t *mutex):
 
+    worker_mutex_destroy will reset the fields of the worker_mutex_t so that it cannot be used until it is re-initialized.
     
 static void schedule():
 
     schedule is the main scheduler function to which the scheduler context is assigned to and to which the thread library is built on.  The first thing done in the schedule function is to 
-    disable the timer so the scheduler is not interrupted.  The scheduler then calls the function corresponding to what the selected scheduling policy is, which will store the next thread to 
-    run in curThread.  The status of this thread is changed to "running", the timer is enabled, and the thread is run.  Once the scheduler context takes control again, the thread will be changed
-    back to a status of ready if it is not blocked or terminated, and it will be added to the corresponding queue.
+    disable the timer so the scheduler is not interrupted.  The scheduler then calls the function corresponding to what the selected scheduling policy is, which will store the next thread     to run in curThread.  The status of this thread is changed to "running", the timer is enabled, and the thread is run.  Once the scheduler context takes control again, the thread will      be changed back to a status of ready if it is not blocked or terminated, and it will be added to the appropriate queue based on the scheduling policy.
+    If the thread state is blocked, it will be put in the blocked queue, and if it is terminated it will be put in the terminated queue.
 
     
 static void sched_psjf():
@@ -57,7 +59,8 @@ static void sched_psjf():
     
 static void sched_mlfq():
 
-static void create_tcb(worker_t * thread, tcb* control_block, void *(*function)(void*), void * arg);
+
+static void create_tcb(worker_t * thread, tcb* control_block, void *(*function)(void*), void * arg):
 
     The purpose of this function is to modularize the population of a tcb.  A new context is created, the stack for the new tcb is created, and the fields such as thread id, status, and stack are 
     populated within the tcb.  The context in the tcb is then assigned to the given function.
