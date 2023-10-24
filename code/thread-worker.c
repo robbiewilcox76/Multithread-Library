@@ -414,7 +414,7 @@ void blockedDequeue(){
 }
 
 void resetMLFQ(){
-	//set all thread priorities to 0 and enqueue to run queue
+	//set all thread priorities to 0 and enqueue to top-most queue (threadQueue)
 	if(curThread != NULL) curThread->priority = 0;
 	tcb* blockedTemp = blockedQueue;
 	while(blockedTemp != NULL){
@@ -498,7 +498,7 @@ static void signal_handler(int signum) {
 		#ifdef MLFQ 
 			if(curThread->priority < 3) curThread->priority++;
 			total_quantums_elapsed++;
-			if(total_quantums_elapsed >= 10){
+			if(total_quantums_elapsed >= S){
 				total_quantums_elapsed = 0;
 				resetMLFQ();
 			}

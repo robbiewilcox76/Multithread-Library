@@ -11,9 +11,14 @@
 
 /* To use Linux pthread Library in Benchmark, you have to comment the USE_WORKERS macro */
 #define USE_WORKERS 1
+
+/* Determines how long the timer runs before swapping to scheduler context (10ms) */
 #define QUANTUM 10
 #define TIME_S QUANTUM / 1000
 #define TIME_US (QUANTUM * 1000) % 1000000
+
+/* How many times quantums must elapse before resetting MLFQ */
+#define S 10
 
 /* include lib header files that you need here: */
 #include <unistd.h>
