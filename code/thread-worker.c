@@ -1,4 +1,4 @@
-// File:	thread-worker.ccontext_switches
+// File:	thread-worker.c
 
 // List all group member's name: Fulton Wilcox III, Sean Patrick
 // username of iLab: frw14, smp429
