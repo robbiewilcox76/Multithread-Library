@@ -1,0 +1,53 @@
+Need to submit as pdf
+
+Benchmarks
+
+MLFQ:
+    external_cal.c:
+
+    5: runtime:632 microseconds, context switches:159, turnaround:436, response:23
+    10: runtime:585 microseconds, context switches:186, turnaround:403.181818, response:33.272727
+    20: runtime:580 microseconds, context switches:180, turnaround:221.380952, response:25.571429
+    50: runtime:551 microseconds, context switches:152, turnaround:136.960784, response:69.098039
+    100: runtime:544 microseconds, context switches:262, turnaround:57.108911, response:15.673267
+
+    parallel_cal.c:
+
+    5: runtime:26413 microseconds, context switches:2199, turnaround:7847.166667, response:24.666667
+    10: runtime:25659 microseconds, context switches:2284, turnaround:8532.181818, response:68.818182
+    20: runtime:23512 microseconds, context switches:1716, turnaround:6570.476190, response:144.476190
+    50: runtime:17502 microseconds, context switches:1618, turnaround:5358.666667, response:355.058824
+    100: runtime:16355 microseconds, context switches:1750, turnaround:5278.801980, response:796.693069
+
+    vector_multiply.c:
+
+    5: runtime:49 microseconds, context switches:9, turnaround:21.333333, response:16.166667
+    10: runtime:50 microseconds, context switches:14, turnaround:25.818182, response:22.727273
+    20: runtime:51 microseconds, context switches:24, turnaround:28.428571, response:26.904762
+    50: runtime:54 microseconds, context switches:54, turnaround:30.235294, response:29.509804
+    100: runtime:52 microseconds, context switches:104, turnaround:28.504950, response:28.148515
+
+PSJF:
+    external_cal.c:
+
+    5: runtime:633 microseconds, context switches:143, turnaround:444.833333, response:24
+    10: runtime:655 microseconds, context switches:216, turnaround:469.545455, response:47
+    20: runtime:595 microseconds, context switches:190, turnaround:264.809524, reponse:59.428571
+    50: runtime:532 microseconds, context switches:174, turnaround:109.607843, response:26.647059
+    100: runtime:609 microseconds, context switches:274, turnaround:61.198020, response:16.574257
+
+    parallel_cal.c:
+
+    5: runtime:28842 microseconds, context switches:2269, turnaround:8418.666667, response:25
+    10: runtime:26100 microseconds, context switches:2142, turnaround:8076.090909 response:73.818182
+    20: runtime:22584 microseconds, context switches:1688, turnaround:6907.476190, response:143.761905
+    50: runtime:18224 microseconds, context switches:1638, turnaround:5667.098039, response:384.921569
+    100: runtime:15009 microseconds, context switches:1568, turnaround:4648.623762, response:803.287129
+
+    vector_multiply.c:
+
+    5: runtime:52 microseconds, context switches:9, turnaround:21.833333, response:16
+    10: runtime:50 microseconds, context switches:14, turnaround:25.545455, response:22.454545
+    20: runtime:50 microseconds, context switches:24, turnaround:28.238095, response:26.714286
+    50: runtime:49 microseconds, context switches:54, turnaround:27.666667, response:26.960784
+    100: runtime:51 microseconds, context switches:104, turnaround:29.029703, response:28.673267
