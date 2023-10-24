@@ -1,8 +1,8 @@
 // File:	worker_t.h
 
-// List all group member's name:
-// username of iLab:
-// iLab Server:
+// List all group member's name: Fulton Wilcox III, Sean Patrick
+// username of iLab: frw14, smp429
+// iLab Server: ilab4
 
 #ifndef WORKER_T_H
 #define WORKER_T_H
