@@ -41,7 +41,6 @@ tcb *curThread; //currently running thread
 int initialcall = 1;
 
 /* Sean's variables */
-
 /* MLFQ levels 2-4 */
 tcb *threadQueue_level_2; 
 tcb *threadQueue_level_3; 
@@ -122,28 +121,11 @@ int worker_join(worker_t thread, void **value_ptr) {
 
 	// YOUR CODE HERE
 
-	tcb *joining_thread = search(thread, threadQueue);
-	if(joining_thread == NULL){
-		joining_thread = search(thread, blockedQueue);
-		if(joining_thread == NULL) { 
-			joining_thread = search(thread, terminatedQueue);
-			if(joining_thread == NULL) { 
-				joining_thread = search(thread, threadQueue_level_2);
-				if(joining_thread == NULL){
-					joining_thread = search(thread, threadQueue_level_3);
-					if(joining_thread == NULL){
-						joining_thread = search(thread, threadQueue_level_4);
-						if(joining_thread == NULL){ if(DEBUG) printf("join error: search returned null\n"); exit(1);}
-					}
-				}
-			}
-		}
-	}
+	tcb* joining_thread = searchAllQueues(thread);
+	if(joining_thread == NULL){ if(DEBUG) printf("join error: search returned null\n"); exit(1);}
 	if(DEBUG)printf("found %d, searched with %d\n", joining_thread->thread_id, thread);
 
-	while(joining_thread->thread_status != terminated) { 
-		
-	}
+	while(joining_thread->thread_status != terminated) {}
 
 	if(value_ptr) *value_ptr = joining_thread->return_value; //save return value
 	if(joining_thread->stack) free(joining_thread->stack); //free thread memory
@@ -209,15 +191,8 @@ int worker_mutex_unlock(worker_mutex_t *mutex) {
 	if(mutex->initialized == 0 || mutex->locked == 0){ if(DEBUG) printf("mutex unlocked or uninitialized\n"); return -1; }
 	if(mutex->lock_owner != curThread){ if(DEBUG) printf("access denied\n"); return -1; }
 
-	//remove threads from blocked queue and add to thread queue
-	if(!isEmpty(blockedQueue)){
-		if(DEBUG) printf("removing thread from blocked queue\n");
-		tcb* temp = blockedQueue;
-		blockedQueue = blockedQueue->next;
-		temp->thread_status = ready;
-		threadQueue = enqueue(temp, threadQueue);
-		if(DEBUG) {printf("thread queue: "); printQueue(threadQueue);}
-	}
+	//remove thread from head of blocked queue and add to thread queue
+	blockedDequeue();
 
 	//release the lock
 	mutex->locked = 0;
@@ -303,7 +278,6 @@ static void sched_psjf() {
 	// (feel free to modify arguments and return types)
 
 	// YOUR CODE HERE
-
 	threadQueue = dequeuePSJF(threadQueue);
 }
 
@@ -314,10 +288,7 @@ static void sched_mlfq() {
 	// (feel free to modify arguments and return types)
 
 	// YOUR CODE HERE
-	if(!isEmpty(threadQueue)) threadQueue = dequeue(threadQueue);
-	else if(!isEmpty(threadQueue_level_2)) threadQueue_level_2 = dequeue(threadQueue_level_2);
-	else if(!isEmpty(threadQueue_level_3)) threadQueue_level_3 = dequeue(threadQueue_level_3);
-	else if(!isEmpty(threadQueue_level_4)) threadQueue_level_4 = dequeue(threadQueue_level_4);
+	dequeueMLFQ();
 }
 
 //DO NOT MODIFY THIS FUNCTION
@@ -424,7 +395,26 @@ tcb* dequeuePSJF(tcb *queue){
 	return queue;
 }
 
+void dequeueMLFQ(){
+	if(!isEmpty(threadQueue)) threadQueue = dequeue(threadQueue);
+	else if(!isEmpty(threadQueue_level_2)) threadQueue_level_2 = dequeue(threadQueue_level_2);
+	else if(!isEmpty(threadQueue_level_3)) threadQueue_level_3 = dequeue(threadQueue_level_3);
+	else if(!isEmpty(threadQueue_level_4)) threadQueue_level_4 = dequeue(threadQueue_level_4);
+}
+
+void blockedDequeue(){
+	if(!isEmpty(blockedQueue)){
+		if(DEBUG) printf("removing thread from blocked queue\n");
+		tcb* temp = blockedQueue;
+		blockedQueue = blockedQueue->next;
+		temp->thread_status = ready;
+		threadQueue = enqueue(temp, threadQueue);
+		if(DEBUG) {printf("thread queue: "); printQueue(threadQueue);}
+	}
+}
+
 void resetMLFQ(){
+	//set all thread priorities to 0 and enqueue to run queue
 	if(curThread != NULL) curThread->priority = 0;
 	tcb* blockedTemp = blockedQueue;
 	while(blockedTemp != NULL){
@@ -463,12 +453,28 @@ static tcb* search(worker_t thread, tcb* queue) {
 	return NULL;
 }
 
+static tcb* searchAllQueues(worker_t thread){
+	tcb *joining_thread = search(thread, threadQueue);
+	if(joining_thread == NULL) joining_thread = search(thread, blockedQueue);
+	if(joining_thread == NULL) joining_thread = search(thread, terminatedQueue);
+	#ifdef MLFQ
+		if(joining_thread == NULL) joining_thread = search(thread, threadQueue_level_2);
+		if(joining_thread == NULL) joining_thread = search(thread, threadQueue_level_3);
+		if(joining_thread == NULL) joining_thread = search(thread, threadQueue_level_4);
+	#endif
+	return joining_thread;
+}
+
 int isEmpty(tcb *queue) {
 	return queue == NULL;
 }
 
 int areQueuesEmpty(){
-	if(isEmpty(threadQueue) && isEmpty(threadQueue_level_2) && isEmpty(threadQueue_level_3) && isEmpty(threadQueue_level_4)) return 1;
+	#ifndef MLFQ 
+		if(isEmpty(threadQueue)) return 1;
+	#else
+		if(isEmpty(threadQueue) && isEmpty(threadQueue_level_2) && isEmpty(threadQueue_level_3) && isEmpty(threadQueue_level_4)) return 1;
+	#endif
 	return 0;
 }
 
@@ -489,8 +495,7 @@ static void signal_handler(int signum) {
 	if(DEBUG) puts("signal received\n");
 
 	if(curThread != NULL ){
-		#ifndef MLFQ 
-		#else
+		#ifdef MLFQ 
 			if(curThread->priority < 3) curThread->priority++;
 			total_quantums_elapsed++;
 			if(total_quantums_elapsed >= 10){

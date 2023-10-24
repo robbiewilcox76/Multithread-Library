@@ -121,6 +121,9 @@ static void create_tcb(worker_t * thread, tcb* control_block, void *(*function)(
 /* Search queue for specified thread */
 static tcb* search(worker_t thread, tcb* queue);
 
+/* Search all queues for specified thread */
+static tcb* searchAllQueues(worker_t thread);
+
 /* Function to add new thread to queue.*/
 tcb* enqueue(tcb *thread, tcb *queue);
 
@@ -134,7 +137,10 @@ tcb* dequeue(tcb *queue);
 tcb* dequeuePSJF(tcb *queue);
 
 /* Function to remove thread with MLFQ scheduling */
-tcb* dequeueMLFQ(tcb *queue);
+void dequeueMLFQ();
+
+/* Removes thread from blocked queue and enqueues to run queue */
+void blockedDequeue();
 
 /* Function to reset MLFQ and thread priorities */
 void resetMLFQ();

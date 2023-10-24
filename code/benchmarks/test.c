@@ -48,7 +48,7 @@ int main(int argc, char **argv) {
 	int num4 = worker_create(&thread4, NULL, (void*)&mutex_test, 6);
 	int num5 = worker_create(&thread5, NULL, (void*)&mutex_test, 6);
 	int num6 = worker_create(&thread6, NULL, (void*)&mutex_test, 6);
-	int num7 = worker_create(&thread7, NULL, (void*)&mutex_test, 6); 
+    int num7 = worker_create(&thread7, NULL, (void*)&mutex_test, 6); 
 	int num8 = worker_create(&thread8, NULL, (void*)&mutex_test, 6); 
 	int num9 = worker_create(&thread9, NULL, (void*)&mutex_test, 6);
 	int num10 = worker_create(&thread10, NULL, (void*)&mutex_test, 6);
