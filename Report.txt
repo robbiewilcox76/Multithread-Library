@@ -53,34 +53,69 @@ static void schedule():
     disable the timer so the scheduler is not interrupted.  The scheduler then calls the function corresponding to what the selected scheduling policy is, which will store the next thread     to run in curThread.  The status of this thread is changed to "running", the timer is enabled, and the thread is run.  Once the scheduler context takes control again, the thread will      be changed back to a status of ready if it is not blocked or terminated, and it will be added to the appropriate queue based on the scheduling policy.
     If the thread state is blocked, it will be put in the blocked queue, and if it is terminated it will be put in the terminated queue.
 
-    
 static void sched_psjf():
 
+    sched_psjf will search through the run queue to find the thread with the lowest quantums elapsed, which is a field of the TCB structure and it corresponds to how many times the thread
+    runs and then is interrupted by the timer to return to the scheduler, which then will increment this field. The QUANTUM macro in the header file determines how long a quantum is, and
+    we used 10 to make the timer interrupt every 10ms. The thread with the lowest quantums elapsed is then removed from the run queue and will be run when the scheduler swaps contexts to
+    its context.
     
 static void sched_mlfq():
 
+    sched_mlfq will search through the 4 levels of queues starting at the top-most queue until it finds the first thread, which corresponds to the thread with a high priority.
+    The thread will then be removed from the run queue and the scheduler will swap contexts to its context so it runs next.
+    Every time the timer interrupts, the current thread that was running will have its priority lowered, and then upon returning to the scheduler, the thread will then be enqueued
+    to a lower level queue depending on its priority. The MLFQ algorithm also requires a global count of quantums elapsed so that the 4 levels of queues can periodically be reset
+    according to rule 5 of MLFQ. The S macro in the header determines how many quantums must elapse before the MLFQ is reset. Every time the timer interrupts, the total quantum counter is     incremented and depending on how many quantums have elasped, the MLFQ may be reset (thread prioroties set to 0 and all threads enqueued to the top level queue).
 
 static void create_tcb(worker_t * thread, tcb* control_block, void *(*function)(void*), void * arg):
 
-    The purpose of this function is to modularize the population of a tcb.  A new context is created, the stack for the new tcb is created, and the fields such as thread id, status, and stack are 
-    populated within the tcb.  The context in the tcb is then assigned to the given function.
+    The purpose of this function is to modularize the population of a tcb.  A new context is created, the stack for the new tcb is created, and the fields such as thread id, status, and       stack are populated within the tcb. The context in the tcb is then assigned to the given function.
 
 tcb* enqueue(tcb *thread, tcb *queue):
 
-    This is a function to add a new tcb to the given queue.  It either assigns the pointer of the queue to the pointer of the thread if the queue is empty, or traverses to the end of the queue and 
-    appends the thread.
+    This is a function to add a new tcb to the given queue.  It either assigns the pointer of the queue to the pointer of the thread if the queue is empty, or traverses to the end of the      queue and appends the thread.
+
+void enqueueMLFQ(tcb* thread):
+
+    This function will place the thread into one of the 4 levels of queues depending on its priority.
 
 tcb* dequeue(tcb *queue):
 
     Function to dequeue from the given queue.
-    
+
+tcb* dequeuePSJF(tcb *queue):
+
+    This function handles searching for a thread with the lowest quantums elasped and manipulating the run queue appropriately.
+
+void dequeueMLFQ():
+
+    This function handles dequeueing a thread from the highest level queue where a thread is present.
+
+void blockedDequeue():
+
+    This function handles removing the thread at the head of the blocked queue and putting it back in the run queue.
+
+void resetMLFQ():
+
+    This function sets all thread priorities to 0 and then moves them all to the highest level run queue (the main run queue).
+
 static tcb* search(worker_t thread, tcb* queue):
 
     This function searches for the thread corresponding to the given thread id in the given queue.  It returns the tcb upon a search hit and returns null upon a search miss.
 
+static tcb* searchAllQueues(worker_t thread):
+
+    This function searches all of the queues to find the specified thread so that worker_join can free its data.
+    The queues searched depends on the scheduling policy as some of the queues are only used with the MLFQ policy.
+
 int isEmpty(tcb *queue):
 
     Abstraction to verify if queue is empty
+
+int areQueuesEmpty():
+
+    Checks all of the queues to determine if any threads are present. The queues checked depends on the scheduling policy.
 
 void printQueue(tcb *queue):
 
@@ -91,6 +126,9 @@ void toString(tcb *thread):
     Helper function to print information about a thread
 
 static void signal_handler(int signum):
+
+    This function is called upon every timer interrupt. This is the key for scheduling the threads appropriately. It also handles keeping track of the total quantums elasped, resetting
+    the MLFQ periodically, and lowering a thread's priority when it completes a time quantum.
  
 static void enable_timer():
 
