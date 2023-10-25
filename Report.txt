@@ -211,4 +211,4 @@ Benchmark Result Analysis:
 
 4)
 Collaboration and References:
-The only reference we used was https://man7.org/linux/man-pages/man3/ in order to learn about different syntax and how different functions work.
+The only references we used were https://man7.org/linux/man-pages/man3/ and occasional googling in order to learn about different syntax and how different functions work.
