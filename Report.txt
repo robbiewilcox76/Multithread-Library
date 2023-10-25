@@ -203,5 +203,12 @@ PSJF:
 3)
 Benchmark Result Analysis:
 
+    On average, the MLFQ scheduling policy results in faster run times and increasing the number of threads also improves the run time. However, it appears that sometimes
+    increasing the number of threads can actually increse the runtime which could indicate that allocating more data for threads and/or having to switch between more threads 
+    can hurt the run time. Additionally, comparing these results to those of the standard pthread library showed that the pthread library results in much faster run times. The run
+    times were approximately half that of the run times from using our worker thread library. This is most likely due to the pthread library handling many more cases and implementing
+    scheduling algorithms much more elegantly and with more optimizations than our implementation.
+
 4)
 Collaboration and References:
+The only reference we used was https://man7.org/linux/man-pages/man3/ in order to learn about different syntax and how different functions work.
